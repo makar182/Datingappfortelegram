@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { Match, Message } from '../App';
-import { Send, HelpCircle, MessageSquare, Check, X, CornerDownRight, Heart, Sparkles, Brain, Menu } from 'lucide-react';
+import { Send, HelpCircle, MessageSquare, Check, X, CornerDownRight, Heart, Sparkles, Brain, Trash2, Eye } from 'lucide-react';
 import { ImageWithFallback } from './figma/ImageWithFallback';
 import { ProfileModal } from './ProfileModal';
 
@@ -9,9 +9,10 @@ interface MessagesProps {
   mutualMatches: Match[];
   onSelectMatch?: (match: Match) => void;
   onCloseChat?: () => void;
+  onRemoveMatch?: (matchId: string) => void;
 }
 
-export function Messages({ chatMatch, mutualMatches, onSelectMatch, onCloseChat }: MessagesProps) {
+export function Messages({ chatMatch, mutualMatches, onSelectMatch, onCloseChat, onRemoveMatch }: MessagesProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [showProfileModal, setShowProfileModal] = useState(false);
@@ -35,6 +36,13 @@ export function Messages({ chatMatch, mutualMatches, onSelectMatch, onCloseChat 
     }
   }>({});
   const [matchedAnswersCount, setMatchedAnswersCount] = useState(0);
+  const [matchedQuestions, setMatchedQuestions] = useState<{
+    id: string;
+    question: string;
+    myAnswer: string;
+    theirAnswer: string;
+  }[]>([]);
+  const [showMatchedQuestionsModal, setShowMatchedQuestionsModal] = useState(false);
   const [meetingVote, setMeetingVote] = useState<{
     myVote: 'yes' | 'no' | 'not-ready' | null;
     theirVote: 'yes' | 'no' | 'not-ready' | null;
@@ -48,7 +56,6 @@ export function Messages({ chatMatch, mutualMatches, onSelectMatch, onCloseChat 
   });
   const [showMeetingWarning, setShowMeetingWarning] = useState(false);
   const [timerTick, setTimerTick] = useState(0);
-  const [showStageMenu, setShowStageMenu] = useState(false);
   const [aronQuestions, setAronQuestions] = useState<string[]>([]);
   const [currentAronQuestionIndex, setCurrentAronQuestionIndex] = useState(0);
   const [currentDisplayedQuestion, setCurrentDisplayedQuestion] = useState<string | null>(null);
@@ -56,8 +63,40 @@ export function Messages({ chatMatch, mutualMatches, onSelectMatch, onCloseChat 
   const [eyeContactTimer, setEyeContactTimer] = useState(240); // 4 minutes = 240 seconds
   const [isTimerRunning, setIsTimerRunning] = useState(false);
   const [experimentComplete, setExperimentComplete] = useState(false);
+  
+  // Главный вопрос - новые состояния
+  const [showMainQuestionIntro, setShowMainQuestionIntro] = useState(false);
+  const [mainQuestionTimer, setMainQuestionTimer] = useState<Date | null>(null); // 3 days timer
+  const [showMainQuestion, setShowMainQuestion] = useState(false);
+  const [earlyMainQuestionRequest, setEarlyMainQuestionRequest] = useState<'none' | 'requested' | 'confirmed'>('none');
+  const [showPartnerConfirmation, setShowPartnerConfirmation] = useState(false);
+  const [mainQuestionAnswers, setMainQuestionAnswers] = useState<{
+    myAnswer: 'yes' | 'no' | null;
+    theirAnswer: 'yes' | 'no' | null;
+  }>({
+    myAnswer: null,
+    theirAnswer: null,
+  });
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [showRejectionModal, setShowRejectionModal] = useState(false);
+  const [contactInfo, setContactInfo] = useState('');
+  const [partnerContactInfo, setPartnerContactInfo] = useState(''); // For testing
+  const [testPartnerAnswer, setTestPartnerAnswer] = useState<'yes' | 'no' | null>(null); // For testing
+  const [showContactInput, setShowContactInput] = useState(false); // Show contact input step
+  
+  // Удаление чата - новые состояния
+  const [showDeleteChatModal, setShowDeleteChatModal] = useState(false);
+  const [deleteReason, setDeleteReason] = useState('');
+  const [showPartnerDeleteNotification, setShowPartnerDeleteNotification] = useState(false);
+  const [partnerDeleteInfo, setPartnerDeleteInfo] = useState<{ reason: string; sharedFeedback: boolean } | null>(null);
+  
+  // Модальные окна этапов
+  const [showStageTransitionModal, setShowStageTransitionModal] = useState(false);
+  const [transitionStageName, setTransitionStageName] = useState('');
+  
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messageRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
+  const hasShownIntroRef = useRef<string | null>(null); // Track if intro was shown for current chat
   const currentUserId = 'user-1';
 
   const stages = ['Знакомство', 'Интуиция', 'Сближение', 'Главный вопрос', 'Свидание', 'Свободное общение'];
@@ -67,13 +106,13 @@ export function Messages({ chatMatch, mutualMatches, onSelectMatch, onCloseChat 
     // Набор 1 (вопросы 1-12)
     '1. Если бы вы могли выбрать кого угодно в мире, кого бы вы пригласили на ужин?',
     '2. Хотели бы вы быть знаменитым? Каким образом?',
-    '3. Прежде чем позвонить по телефону, вы когда-нибудь репетируете то, что собираетесь сказать? Почему?',
-    '4. Что для вас было бы "идеальным" днем?',
+    '3. Прежде чем позвонить по телефону, вы ко��да-нибудь репетируете то, что собираетесь сказать? Почему?',
+    '4. Что для вас было бы "идеальны��" днем?',
     '5. Когда вы в последний раз пели для себя? А для кого-то другого?',
     '6. Если бы вы могли дожить до 90 лет и сохранить либо разум, либо тело 30-летнего на последние 60 лет вашей жизни, что бы вы выбрали?',
     '7. У вас есть ��айное предчувствие о том, как вы умрёте?',
     '8. Назовите три общие черты между вами и вашим партнёром.',
-    '9. За что в своей жизни вы больше всего благодарны?',
+    '9. За что в своей жизни вы бо��ьше всего благодарны?',
     '10. Если бы вы могли что-то изменить в том, как вас воспитывали, что бы это было?',
     '11. В течение 4 минут расскажите своему партнёру историю своей жизни как можно подробнее.',
     '12. Если бы вы могли проснуться завтра, обладая каким-либо качеством или способностью, что бы это было?',
@@ -88,21 +127,21 @@ export function Messages({ chatMatch, mutualMatches, onSelectMatch, onCloseChat 
     '20. Что значит дружба для вас?',
     '21. Какую роль играют любовь и привязанность в вашей жизни?',
     '22. По очереди поделитесь тем, что считаете положительными качествами своего партнёра. Поделитесь пятью пунктами.',
-    '23. Насколько близки и тёплы отношения в вашей семье? Считаете ли вы своё детство более счастливым, чем у большинства людей?',
+    '23. Наско��ько близки и тёплы отношения в вашей семье? Считаете ли вы своё детство более счастливым, чем у большинства людей?',
     '24. Как вы относитесь к своим отношениям с матерью?',
     // Набор 3 (вопросы 25-36)
     '25. Произнесите три истинных утверждения, используя "мы". Например, "Мы оба находимся в этой комнате и чувствуем..."',
-    '26. Закончите это предложение: "Хотел бы я, чтобы у меня был кто-то, с кем я мог бы разделить..."',
+    '26. Закончите это предложение: "Хотел бы я, чтобы у ме��я был кто-то, с кем я мог бы разделить..."',
     '27. Если бы вы собирались стать близким другом со своим партнёром, пожалуйста, поделитесь тем, что было бы важно для него или неё знать.',
     '28. Расскажите партнёру, что вам в нём или в ней нравится; будьте на этот раз очень честными, говоря то, что не сказали бы кому-то, с кем только что познакомились.',
-    '29. Поделитесь с партнёром неловким моментом в вашей жизни.',
+    '29. Поделитесь с партнёром нело��ким моментом в вашей жизни.',
     '30. Когда вы в последний раз плакали перед другим человеком? А в одиночестве?',
     '31. Расскажите партнёру, что вам в нём или в ней уже нравится.',
     '32. Что для вас слишком серьёзно, чтобы шутить об этом?',
-    '33. Если бы вы должны были умереть сегодня вечером без возможности поговорить с кем-либо, о чём вы больше всего сожалели бы, что не сказали кому-то? Почему вы до сих пор не сказали им это?',
+    '33. Если бы вы должны были умереть сегодня вечером без возможности поговорить с кем-либо, о чём вы больше всего сожалели бы, что не сказали ��ому-то? Почему вы до сих пор не сказали им это?',
     '34. Ваш дом со всем, что у вас есть, загорается. После спасения близких и домашних животных у вас есть время, чтобы безопасно совершить последний рывок и спасти один предмет. Что это было бы? Почему?',
-    '35. Из всех людей в вашей семье, чья смерть была бы для вас самой тяжёлой? Почему?',
-    '36. Поделитесь личной проблемой и спросите у партнёра совета о том, как он или она справились бы с ней. Также попросите партнёра рассказать вам, как, по его или её мнению, вы относитесь к выбранной вами проблеме.',
+    '35. Из всех людей в вашей семье, чья смерть был�� бы для вас самой тяжёлой? Почему?',
+    '36. Поделитесь личной проблемой и спросите у партнёра совета о том, как он или она справились бы с ней. Также попросите партнёра рассказа��ь вам, как, по его или её мнению, вы относитесь к выбранной вами проблеме.',
   ];
 
   useEffect(() => {
@@ -172,6 +211,39 @@ export function Messages({ chatMatch, mutualMatches, onSelectMatch, onCloseChat 
     scrollToBottom();
   }, [messages]);
 
+  // Show "Знакомство" stage intro when chat first opens
+  useEffect(() => {
+    if (chatMatch && currentStage === 'Знакомство' && hasShownIntroRef.current !== chatMatch.id) {
+      hasShownIntroRef.current = chatMatch.id;
+      const timer = setTimeout(() => {
+        setTransitionStageName('Знакомство');
+        setShowStageTransitionModal(true);
+      }, 300);
+      return () => clearTimeout(timer);
+    }
+  }, [chatMatch, currentStage]);
+
+  // Timer for main question (3 days)
+  useEffect(() => {
+    if (mainQuestionTimer && !showMainQuestion) {
+      const interval = setInterval(() => {
+        const now = Date.now();
+        const timeLeft = mainQuestionTimer.getTime() - now;
+        
+        if (timeLeft <= 0) {
+          // Time's up, show main question (cannot be closed without answering)
+          setShowMainQuestion(true);
+          clearInterval(interval);
+        } else {
+          // Force re-render to update timer display
+          setTimerTick(prev => prev + 1);
+        }
+      }, 1000);
+
+      return () => clearInterval(interval);
+    }
+  }, [mainQuestionTimer, showMainQuestion]);
+
   // Timer update for postponed vote
   useEffect(() => {
     if (!meetingVote.canRevote && meetingVote.postponedUntil) {
@@ -196,6 +268,45 @@ export function Messages({ chatMatch, mutualMatches, onSelectMatch, onCloseChat 
       return () => clearInterval(interval);
     }
   }, [meetingVote.canRevote, meetingVote.postponedUntil]);
+
+  // Auto-transition from Знакомство to Интуиция
+  useEffect(() => {
+    if (currentStage === 'Знакомство' && sharedMessageCount <= 0 && !showStageTransitionModal) {
+      const timer = setTimeout(() => {
+        setTransitionStageName('Интуиция');
+        setShowStageTransitionModal(true);
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [currentStage, sharedMessageCount, showStageTransitionModal]);
+
+  // Auto-transition from Интуиция to Сближение
+  useEffect(() => {
+    if (currentStage === 'Интуиция' && sharedMessageCount <= 0 && questionCount <= 0 && !showStageTransitionModal) {
+      const timer = setTimeout(() => {
+        setTransitionStageName('Сближение');
+        setShowStageTransitionModal(true);
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [currentStage, sharedMessageCount, questionCount, showStageTransitionModal]);
+
+  // Auto-trigger Main Question intro when Сближение stage is complete
+  useEffect(() => {
+    if (currentStage === 'Сближение' && 
+        sharedMessageCount <= 0 && 
+        questionCategories.closer <= 0 && 
+        questionCategories.evenCloser <= 0 && 
+        questionCategories.innerWorld <= 0 && 
+        !showMainQuestionIntro && 
+        !mainQuestionTimer) {
+      // Small delay to make transition smoother
+      const timer = setTimeout(() => {
+        setShowMainQuestionIntro(true);
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [currentStage, sharedMessageCount, questionCategories.closer, questionCategories.evenCloser, questionCategories.innerWorld, showMainQuestionIntro, mainQuestionTimer]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -274,10 +385,158 @@ export function Messages({ chatMatch, mutualMatches, onSelectMatch, onCloseChat 
   const handleMoveToNextStage = () => {
     const currentIndex = stages.indexOf(currentStage);
     if (currentIndex < stages.length - 1) {
-      setCurrentStage(stages[currentIndex + 1]);
+      const nextStage = stages[currentIndex + 1];
+      
+      // Special handling for "Главный вопрос" stage
+      if (nextStage === 'Главный вопрос') {
+        setShowMainQuestionIntro(true);
+        return;
+      }
+      
+      setCurrentStage(nextStage);
       setSharedMessageCount(5); // Reset counter for new stage
       setQuestionCount(5); // Reset question counter for new stage
     }
+  };
+  
+  const handleStageTransitionClose = () => {
+    setShowStageTransitionModal(false);
+    setCurrentStage(transitionStageName);
+    
+    if (transitionStageName === 'Интуиция') {
+      setSharedMessageCount(5);
+      setQuestionCount(5);
+    } else if (transitionStageName === 'Сближение') {
+      setSharedMessageCount(5);
+      setQuestionCategories({
+        closer: 5,
+        evenCloser: 5,
+        innerWorld: 5
+      });
+    }
+  };
+  
+  const handleMainQuestionIntroClose = () => {
+    setShowMainQuestionIntro(false);
+    setCurrentStage('Главный вопрос');
+    setSharedMessageCount(0); // Reset to 0 - unlimited messages
+    setQuestionCount(0); // Reset to 0
+    setQuestionCategories({
+      closer: 0,
+      evenCloser: 0,
+      innerWorld: 0
+    }); // Reset all question categories to 0 - unlimited questions
+    
+    // Start 3-day timer
+    const threeDaysLater = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000); // 3 days
+    setMainQuestionTimer(threeDaysLater);
+  };
+  
+  const handleRequestEarlyMainQuestion = () => {
+    setEarlyMainQuestionRequest('requested');
+    setShowPartnerConfirmation(true);
+  };
+  
+  const handlePartnerResponse = (confirmed: boolean) => {
+    setShowPartnerConfirmation(false);
+    if (confirmed) {
+      setEarlyMainQuestionRequest('confirmed');
+      setShowMainQuestion(true);
+    } else {
+      setEarlyMainQuestionRequest('none');
+    }
+  };
+  
+  const handleMainQuestionAnswer = (answer: 'yes' | 'no') => {
+    setMainQuestionAnswers(prev => ({ ...prev, myAnswer: answer }));
+    
+    // If answer is NO, skip contact input and show rejection modal
+    if (answer === 'no') {
+      setShowContactInput(false);
+      setShowMainQuestion(false);
+      
+      // Simulate partner's response after a delay
+      setTimeout(() => {
+        setMainQuestionAnswers(prev => ({ ...prev, theirAnswer: testPartnerAnswer || 'no' }));
+        setShowRejectionModal(true);
+      }, 1500);
+    } else {
+      // If answer is YES, show contact input form
+      setShowContactInput(true);
+    }
+  };
+  
+  const handleContactInfoSubmit = () => {
+    // Check if test partner answer is set
+    if (!testPartnerAnswer) {
+      alert('⚠️ Пожалуйста, установите тестовый ответ собеседника в настройках выше');
+      return;
+    }
+    
+    setShowContactInput(false);
+    
+    // Simulate waiting for partner's answer
+    setTimeout(() => {
+      const partnerAnswer = testPartnerAnswer;
+      setMainQuestionAnswers(prev => ({ ...prev, theirAnswer: partnerAnswer }));
+      
+      // Check results
+      if (mainQuestionAnswers.myAnswer === 'yes' && partnerAnswer === 'yes') {
+        setShowMainQuestion(false);
+        setShowSuccessModal(true);
+      } else {
+        setShowMainQuestion(false);
+        setShowRejectionModal(true);
+      }
+    }, 1500);
+  };
+  
+  const handleSuccessModalContinue = () => {
+    setShowSuccessModal(false);
+    setCurrentStage('Свидание');
+    setSharedMessageCount(5);
+  };
+  
+  const handleChatDeletion = () => {
+    setShowRejectionModal(false);
+    // Remove match from the list
+    if (chatMatch && onRemoveMatch) {
+      onRemoveMatch(chatMatch.id);
+    }
+    onCloseChat?.();
+  };
+
+  // Обработчик удаления чата вручную
+  const handleDeleteChatClick = () => {
+    setShowDeleteChatModal(true);
+  };
+
+  const handleConfirmDeleteChat = () => {
+    setShowDeleteChatModal(false);
+    
+    // Сохраняем информацию для показа партнеру
+    // Если есть текст обратной связи, он всегда передаётся собеседнику
+    setPartnerDeleteInfo({
+      reason: deleteReason,
+      sharedFeedback: deleteReason.trim().length > 0
+    });
+    
+    // Для теста показываем сразу уведомление партнера
+    setShowPartnerDeleteNotification(true);
+  };
+
+  const handlePartnerDeleteNotificationClose = () => {
+    setShowPartnerDeleteNotification(false);
+    
+    // После закрытия уведомления удаляем чат
+    if (chatMatch && onRemoveMatch) {
+      onRemoveMatch(chatMatch.id);
+    }
+    onCloseChat?.();
+    
+    // Сбрасываем состояния
+    setDeleteReason('');
+    setPartnerDeleteInfo(null);
   };
 
   const getNextStageName = () => {
@@ -289,14 +548,14 @@ export function Messages({ chatMatch, mutualMatches, onSelectMatch, onCloseChat 
   };
 
   const handleAskQuestion = (category?: 'closer' | 'evenCloser' | 'innerWorld') => {
-    if ((currentStage === 'Сближение' || currentStage === 'Свободное общение') && category) {
-      // For "Сближение" and "Свободное общение" stages with categories
+    if ((currentStage === 'Сближение' || currentStage === 'Главный вопрос' || currentStage === 'Свободное общение') && category) {
+      // For "Сближение", "Главный вопрос" and "Свободное общение" stages with categories
       // No limit check - questions never end on these stages
       
       const questionsByCategory = {
         closer: [
           'Какой момент ты считаешь самым важным в нашем общении?',
-          'Что тебе нравится в нашем диалоге?',
+          'Что тебе нрав��тся в нашем диалоге?',
           'Как часто ты думаешь о наших разговорах?',
         ],
         evenCloser: [
@@ -329,7 +588,7 @@ export function Messages({ chatMatch, mutualMatches, onSelectMatch, onCloseChat 
       setMessages(prev => [...prev, questionMessage]);
       
       // Decrement category counter only for "Сближение" stage
-      // For "Свободное общение", questions are unlimited and counters don't decrease
+      // For "Главный вопрос" and "Свободное общение", questions are unlimited and counters don't decrease
       if (currentStage === 'Сближение') {
         setQuestionCategories(prev => ({
           ...prev,
@@ -390,9 +649,12 @@ export function Messages({ chatMatch, mutualMatches, onSelectMatch, onCloseChat 
     if (currentIndex === 1) {
       return sharedMessageCount <= 0 && questionCount <= 0;
     }
-    // For "Сближение" stage - questions never end, only check message count
+    // For "Сближение" stage - check message count AND all 3 question categories
     if (currentIndex === 2) {
-      return sharedMessageCount <= 0;
+      return sharedMessageCount <= 0 && 
+             questionCategories.closer <= 0 && 
+             questionCategories.evenCloser <= 0 && 
+             questionCategories.innerWorld <= 0;
     }
     // For "Свободное общение" stage - questions never end, only check message count
     if (currentIndex === 5) {
@@ -502,9 +764,26 @@ export function Messages({ chatMatch, mutualMatches, onSelectMatch, onCloseChat 
         return updated;
       });
 
-      // If both voted yes, increment matched answers
+      // If both voted yes, increment matched answers and save the question
       if (match && theirMatch) {
         setMatchedAnswersCount(prev => prev + 1);
+        
+        // Find the question message and save it to matched questions
+        const questionMessage = messages.find(m => m.id === questionId);
+        if (questionMessage && pending.myAnswer && pending.theirAnswer) {
+          setMatchedQuestions(prev => {
+            // Avoid duplicates
+            if (prev.some(q => q.id === questionId)) {
+              return prev;
+            }
+            return [...prev, {
+              id: questionId,
+              question: questionMessage.text,
+              myAnswer: pending.myAnswer,
+              theirAnswer: pending.theirAnswer,
+            }];
+          });
+        }
       }
     }, 1000);
   };
@@ -530,7 +809,7 @@ export function Messages({ chatMatch, mutualMatches, onSelectMatch, onCloseChat 
   };
 
   const handleDeleteChat = () => {
-    if (window.confirm('Вы уверены, что хотите удалить этот чат?')) {
+    if (window.confirm('Вы уверены, что хотите удалить ��тот чат?')) {
       // Вызываем колбэк для закрытия чата
       onCloseChat?.();
     }
@@ -603,20 +882,6 @@ export function Messages({ chatMatch, mutualMatches, onSelectMatch, onCloseChat 
     setCurrentStage('Свободное общение');
     setShowEyeContact(false);
     setExperimentComplete(false);
-  };
-
-  const handleJumpToStage = (stageName: string) => {
-    setCurrentStage(stageName);
-    setShowStageMenu(false);
-    // Reset meeting vote if needed
-    if (stageName !== 'Главный вопрос') {
-      setMeetingVote({
-        myVote: null,
-        theirVote: null,
-        canRevote: true,
-        postponedUntil: null,
-      });
-    }
   };
 
   if (!chatMatch) {
@@ -712,8 +977,8 @@ export function Messages({ chatMatch, mutualMatches, onSelectMatch, onCloseChat 
   const isСвиданиеStage = currentStage === 'Свидание';
   const isСвободноеОбщениеStage = currentStage === 'Свободное общение';
 
-  // Show meeting question screen if in "Главный вопрос" stage
-  if (isГлавныйВопросStage && meetingVote.canRevote) {
+  // Show OLD meeting question screen if in "Главный вопрос" stage (keeping for backwards compatibility but disabled)
+  if (false && isГлавныйВопросStage && meetingVote.canRevote) {
     const bothVoted = meetingVote.myVote !== null && meetingVote.theirVote !== null;
     const bothVotedYes = meetingVote.myVote === 'yes' && meetingVote.theirVote === 'yes';
     const waitingForPartner = meetingVote.myVote !== null && meetingVote.theirVote === null;
@@ -761,6 +1026,15 @@ export function Messages({ chatMatch, mutualMatches, onSelectMatch, onCloseChat 
           </button>
 
           <div className="flex-1"></div>
+          
+          {/* Delete chat button */}
+          <button
+            onClick={handleDeleteChatClick}
+            className="p-2 hover:bg-red-50 rounded-xl transition-all duration-300 text-gray-400 hover:text-red-600"
+            title="Удалить чат"
+          >
+            <Trash2 className="w-5 h-5" />
+          </button>
         </div>
 
         {/* Meeting Question Content */}
@@ -822,7 +1096,7 @@ export function Messages({ chatMatch, mutualMatches, onSelectMatch, onCloseChat 
             {waitingForPartner && !bothVoted && (
               <div className="bg-purple-50 border-2 border-purple-200 rounded-2xl p-6 space-y-4">
                 <div className="text-center">
-                  <p className="text-purple-700 mb-1">Тестирование: выберите ответ собеседника</p>
+                  <p className="text-purple-700 mb-1">Тестирование: выбе��ите отве�� собеседника</p>
                   <p className="text-sm text-purple-600">Ваш ответ: {
                     meetingVote.myVote === 'yes' ? 'Да' :
                     meetingVote.myVote === 'no' ? 'Нет' :
@@ -881,7 +1155,7 @@ export function Messages({ chatMatch, mutualMatches, onSelectMatch, onCloseChat 
                     }}
                     className="w-full py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl hover:shadow-lg transition-all duration-300 hover:scale-105"
                   >
-                    Узнать друг др��га получше (отложить на 1 день)
+                    Узнать друг друга получше
                   </button>
                   <button
                     onClick={handleRequestRevote}
@@ -1003,7 +1277,36 @@ export function Messages({ chatMatch, mutualMatches, onSelectMatch, onCloseChat 
         </button>
 
         {/* Transition button or postponed timer (centered) */}
-        {showPostponedTimer ? (
+        {isГлавныйВопросStage && mainQuestionTimer && !showMainQuestion ? (
+          <div className="flex-1 flex flex-col items-center gap-1.5">
+            <div className="px-3 py-1.5 bg-gradient-to-r from-rose-600 to-pink-600 text-white text-xs rounded-full shadow-lg">
+              ⏰ Главный вопрос через: {
+                mainQuestionTimer 
+                  ? (() => {
+                      const totalSeconds = Math.ceil((mainQuestionTimer.getTime() - Date.now()) / 1000);
+                      const hours = Math.floor(totalSeconds / 3600);
+                      const mins = Math.floor((totalSeconds % 3600) / 60);
+                      const secs = totalSeconds % 60;
+                      if (hours > 0) return `${hours}ч ${mins}м`;
+                      if (mins > 0) return `${mins}м ${secs}с`;
+                      return `${secs}с`;
+                    })()
+                  : '...'
+              }
+            </div>
+            <button
+              onClick={handleRequestEarlyMainQuestion}
+              disabled={earlyMainQuestionRequest === 'requested'}
+              className={`px-2.5 py-1 text-xs rounded-full transition-all duration-300 ${
+                earlyMainQuestionRequest === 'requested'
+                  ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                  : 'bg-white/80 text-rose-600 hover:bg-white hover:shadow-md hover:scale-105'
+              }`}
+            >
+              {earlyMainQuestionRequest === 'requested' ? '⏳ Ждём ответа...' : '🚀 Готов ответить сейчас'}
+            </button>
+          </div>
+        ) : showPostponedTimer ? (
           <div className="flex-1 flex justify-center">
             <div className="px-3 py-1.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-xs rounded-full shadow-lg">
               ⏳ Главный вопрос через: {
@@ -1013,27 +1316,17 @@ export function Messages({ chatMatch, mutualMatches, onSelectMatch, onCloseChat 
               }
             </div>
           </div>
-        ) : !isСвиданиеStage && canMoveToNextStage() && getNextStageName() && !showPostponedTimer && (
-          <div className="flex-1 flex justify-center">
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                handleMoveToNextStage();
-              }}
-              className="px-3 py-1.5 bg-gradient-to-r from-purple-600 via-pink-600 to-rose-600 text-white text-xs rounded-full shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-300 animate-gradient"
-            >
-              Переход к этапу "{getNextStageName()}"
-            </button>
-          </div>
-        )}
+        ) : null}
 
         {/* Message counters - hide for Свидание */}
         {!isСвиданиеStage && (
-          <div className={`flex items-center gap-2 ${canMoveToNextStage() && getNextStageName() ? '' : 'ml-auto'}`}>
+          <div className="flex items-center gap-2 ml-auto">
             {/* Message counter */}
             <div className="flex items-center gap-1.5 bg-emerald-50 px-2.5 py-1 rounded-full">
             <MessageSquare className="w-3 h-3 text-emerald-600" />
-            {sharedMessageCount > 0 ? (
+            {isГлавныйВопросStage || isСвободноеОбщениеStage ? (
+              <span className="text-xs text-emerald-700">∞</span>
+            ) : sharedMessageCount > 0 ? (
               <span className={`text-xs ${sharedMessageCount <= 3 ? 'text-red-600 font-semibold' : 'text-emerald-700'}`}>
                 {sharedMessageCount}
               </span>
@@ -1042,13 +1335,15 @@ export function Messages({ chatMatch, mutualMatches, onSelectMatch, onCloseChat 
             )}
           </div>
           
-          {/* Question counters - only for Сближение, not for Свободное общение */}
-          {isСближениеStage ? (
+          {/* Question counters - only for Сближение and Главный вопрос, not for Свободное общение */}
+          {isСближениеStage || isГлавныйВопросStage || isСвободноеОбщениеStage ? (
             <>
               {/* Closer counter */}
               <div className="flex items-center gap-1.5 bg-pink-50 px-2.5 py-1 rounded-full border border-pink-200">
                 <Heart className="w-3 h-3 text-pink-600" />
-                {questionCategories.closer > 0 ? (
+                {isГлавныйВопросStage || isСвободноеОбщениеStage ? (
+                  <span className="text-xs text-pink-700">∞</span>
+                ) : questionCategories.closer > 0 ? (
                   <span className={`text-xs ${questionCategories.closer <= 1 ? 'text-red-600 font-semibold' : 'text-pink-700'}`}>
                     {questionCategories.closer}
                   </span>
@@ -1060,7 +1355,9 @@ export function Messages({ chatMatch, mutualMatches, onSelectMatch, onCloseChat 
               {/* Even closer counter */}
               <div className="flex items-center gap-1.5 bg-purple-50 px-2.5 py-1 rounded-full border border-purple-200">
                 <Sparkles className="w-3 h-3 text-purple-600" />
-                {questionCategories.evenCloser > 0 ? (
+                {isГлавныйВопросStage || isСвободноеОбщениеStage ? (
+                  <span className="text-xs text-purple-700">∞</span>
+                ) : questionCategories.evenCloser > 0 ? (
                   <span className={`text-xs ${questionCategories.evenCloser <= 1 ? 'text-red-600 font-semibold' : 'text-purple-700'}`}>
                     {questionCategories.evenCloser}
                   </span>
@@ -1072,7 +1369,9 @@ export function Messages({ chatMatch, mutualMatches, onSelectMatch, onCloseChat 
               {/* Inner world counter */}
               <div className="flex items-center gap-1.5 bg-indigo-50 px-2.5 py-1 rounded-full border border-indigo-200">
                 <Brain className="w-3 h-3 text-indigo-600" />
-                {questionCategories.innerWorld > 0 ? (
+                {isГлавныйВопросStage || isСвободноеОбщениеStage ? (
+                  <span className="text-xs text-indigo-700">∞</span>
+                ) : questionCategories.innerWorld > 0 ? (
                   <span className={`text-xs ${questionCategories.innerWorld <= 1 ? 'text-red-600 font-semibold' : 'text-indigo-700'}`}>
                     {questionCategories.innerWorld}
                   </span>
@@ -1095,21 +1394,89 @@ export function Messages({ chatMatch, mutualMatches, onSelectMatch, onCloseChat 
           )}
           
           {/* Match counter */}
-          {stages.indexOf(currentStage) >= 1 && (
-            <div className="flex items-center gap-1.5 bg-gradient-to-r from-pink-50 to-rose-50 px-2.5 py-1 rounded-full border border-pink-200">
-              <span className="text-xs">💕</span>
-              <span className={`text-xs text-pink-700 ${matchedAnswersCount >= 1 ? 'animate-bounce' : ''}`}>{matchedAnswersCount}</span>
-            </div>
-          )}
+          {stages.indexOf(currentStage) >= 1 && (() => {
+            // Dynamic styling based on matches count
+            let bgGradient = 'from-gray-100 to-gray-200';
+            let borderColor = 'border-gray-300';
+            let textColor = 'text-gray-500';
+            let shadowEffect = '';
+            let pulseEffect = '';
+            let scaleEffect = 'scale-100';
+            let emoji = '🤍';
+            
+            if (matchedAnswersCount >= 16) {
+              // 16+ совпадений: фиолетовый градиент с мощным свечением
+              bgGradient = 'from-purple-500 via-pink-500 to-red-500';
+              borderColor = 'border-purple-400';
+              textColor = 'text-white';
+              shadowEffect = 'shadow-[0_0_30px_rgba(168,85,247,0.8)]';
+              pulseEffect = 'animate-pulse';
+              scaleEffect = 'scale-110';
+              emoji = '💝';
+            } else if (matchedAnswersCount >= 10) {
+              // 10-15 совпадений: красно-фиолетовый градиент с сильным свечением
+              bgGradient = 'from-red-500 via-pink-500 to-purple-400';
+              borderColor = 'border-red-400';
+              textColor = 'text-white';
+              shadowEffect = 'shadow-[0_0_25px_rgba(239,68,68,0.7)]';
+              pulseEffect = 'animate-pulse';
+              scaleEffect = 'scale-105';
+              emoji = '💓';
+            } else if (matchedAnswersCount >= 6) {
+              // 6-9 совпадений: красный градиент со свечением
+              bgGradient = 'from-red-400 to-pink-500';
+              borderColor = 'border-red-300';
+              textColor = 'text-white';
+              shadowEffect = 'shadow-[0_0_20px_rgba(244,63,94,0.6)]';
+              pulseEffect = 'animate-pulse';
+              emoji = '💖';
+            } else if (matchedAnswersCount >= 3) {
+              // 3-5 совпадений: розовый градиент с легким свечением
+              bgGradient = 'from-pink-400 to-rose-400';
+              borderColor = 'border-pink-300';
+              textColor = 'text-white';
+              shadowEffect = 'shadow-[0_0_15px_rgba(236,72,153,0.5)]';
+              pulseEffect = 'animate-pulse';
+              emoji = '💗';
+            } else if (matchedAnswersCount >= 1) {
+              // 1-2 совпадения: светло-розовый
+              bgGradient = 'from-pink-200 to-rose-200';
+              borderColor = 'border-pink-300';
+              textColor = 'text-pink-700';
+              shadowEffect = 'shadow-[0_0_10px_rgba(251,207,232,0.4)]';
+              emoji = '💗';
+            }
+            
+            return (
+              <div className="flex items-center gap-2">
+                <div className={`flex items-center gap-1.5 bg-gradient-to-r ${bgGradient} px-3 py-1.5 rounded-full border ${borderColor} ${shadowEffect} ${pulseEffect} ${scaleEffect} transition-all duration-500`}>
+                  <span className="text-sm">{emoji}</span>
+                  <span className={`${textColor} transition-all duration-500`}>
+                    {matchedAnswersCount}
+                  </span>
+                </div>
+                {matchedAnswersCount > 0 && (
+                  <button
+                    onClick={() => setShowMatchedQuestionsModal(true)}
+                    className="w-8 h-8 rounded-full bg-gradient-to-r from-pink-100 to-rose-100 hover:from-pink-200 hover:to-rose-200 flex items-center justify-center transition-all duration-300 hover:scale-110 border border-pink-300"
+                    title="Посмотреть совпадения"
+                  >
+                    <Eye className="w-4 h-4 text-pink-600" />
+                  </button>
+                )}
+              </div>
+            );
+          })()}
           </div>
         )}
 
-        {/* Burger menu button */}
+        {/* Delete chat button */}
         <button
-          onClick={() => setShowStageMenu(true)}
-          className="w-9 h-9 rounded-full bg-emerald-50 hover:bg-emerald-100 flex items-center justify-center transition-all duration-300 hover:scale-105 ml-2"
+          onClick={handleDeleteChatClick}
+          className="w-9 h-9 rounded-full bg-red-50 hover:bg-red-100 flex items-center justify-center transition-all duration-300 hover:scale-105 ml-2 text-red-600"
+          title="Удалить чат"
         >
-          <Menu className="w-5 h-5 text-emerald-600" />
+          <Trash2 className="w-5 h-5" />
         </button>
       </div>
 
@@ -1187,7 +1554,7 @@ export function Messages({ chatMatch, mutualMatches, onSelectMatch, onCloseChat 
                     Смотрите друг другу в глаза
                   </h2>
                   <p className="text-gray-600 leading-relaxed max-w-md mx-auto">
-                    Заключительный этап эксперимента. Смотрите друг другу в глаза в течение 4 минут, не отводя взгляда.
+                    Заключительный этап эксперимента. Смотрите друг др��гу в глаза в течение 4 минут, не отводя взгляда.
                   </p>
                 </div>
 
@@ -1357,7 +1724,7 @@ export function Messages({ chatMatch, mutualMatches, onSelectMatch, onCloseChat 
                               }`}>
                                 {pending.myMatch && pending.theirMatch ? (
                                   <div className="space-y-1">
-                                    <p className="text-green-700">🎉 Ответы совпали!</p>
+                                    <p className="text-green-700">🎉 От��еты совпали!</p>
                                     <p className="text-xs text-green-600">+1 к шкале совпадений</p>
                                   </div>
                                 ) : (
@@ -1494,7 +1861,7 @@ export function Messages({ chatMatch, mutualMatches, onSelectMatch, onCloseChat 
 
         <div className="flex gap-2 max-w-2xl mx-auto">
           {/* Question buttons - experimental 3D design with glow effects */}
-          {!isСвиданиеStage && (isСближениеStage || isСвободноеОбщениеStage) ? (
+          {!isСвиданиеStage && (isСближениеStage || isГлавныйВопросStage || isСвободноеОбщениеStage) ? (
             <div className="relative flex items-center gap-1" style={{ perspective: '1000px' }}>
               {/* Connection lines between bubbles */}
               <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
@@ -1508,7 +1875,7 @@ export function Messages({ chatMatch, mutualMatches, onSelectMatch, onCloseChat 
                   onClick={() => handleAskQuestion('closer')}
                   data-tooltip="Быть ближе"
                   className={`tooltip-trigger relative z-10 w-12 h-12 rounded-full flex items-center justify-center transition-all duration-500 backdrop-blur-sm ${
-                    (isСвободноеОбщениеStage || questionCategories.closer > 0)
+                    (isСближениеStage || isГлавныйВопросStage || isСвободноеОбщениеStage || questionCategories.closer > 0)
                       ? 'bg-gradient-to-br from-pink-500 via-rose-500 to-pink-600 text-white shadow-lg shadow-pink-500/50 hover:shadow-2xl hover:shadow-pink-500/60 hover:-translate-y-1 active:scale-95'
                       : 'bg-gray-200/80 text-gray-400 cursor-not-allowed'
                   }`}
@@ -1517,7 +1884,7 @@ export function Messages({ chatMatch, mutualMatches, onSelectMatch, onCloseChat 
                     transition: 'all 0.5s cubic-bezier(0.34, 1.56, 0.64, 1)'
                   }}
                   onMouseEnter={(e) => {
-                    if (isСвободноеОбщениеStage || questionCategories.closer > 0) {
+                    if (isСближениеStage || isГлавныйВопросStage || isСвободноеОбщениеStage || questionCategories.closer > 0) {
                       e.currentTarget.style.transform = 'rotateY(15deg) translateY(-4px) scale(1.1)';
                     }
                   }}
@@ -1525,12 +1892,12 @@ export function Messages({ chatMatch, mutualMatches, onSelectMatch, onCloseChat 
                     e.currentTarget.style.transform = 'rotateY(0deg) translateY(0px) scale(1)';
                   }}
                 >
-                  <Heart className={`w-5 h-5 ${(isСвободноеОбщениеStage || questionCategories.closer > 0) ? 'drop-shadow-lg' : ''}`} />
-                  {(isСвободноеОбщениеStage || questionCategories.closer > 0) && (
+                  <Heart className={`w-5 h-5 ${(isСближениеStage || isГлавныйВопросStage || isСвободноеОбщениеStage || questionCategories.closer > 0) ? 'drop-shadow-lg' : ''}`} />
+                  {(isСближениеStage || isГлавныйВопросStage || isСвободноеОбщениеStage || questionCategories.closer > 0) && (
                     <div className="absolute inset-0 rounded-full bg-white/20 animate-ping opacity-75"></div>
                   )}
                 </button>
-                {(isСвободноеОбщениеStage || questionCategories.closer > 0) && (
+                {(isСближениеStage || isГлавныйВопросStage || isСвободноеОбщениеStage || questionCategories.closer > 0) && (
                   <div className="absolute inset-0 rounded-full bg-pink-400 blur-xl opacity-30 group-hover:opacity-50 transition-opacity duration-300"></div>
                 )}
               </div>
@@ -1542,16 +1909,16 @@ export function Messages({ chatMatch, mutualMatches, onSelectMatch, onCloseChat 
                   onClick={() => handleAskQuestion('evenCloser')}
                   data-tooltip="Еще ближе"
                   className={`tooltip-trigger relative z-10 w-12 h-12 rounded-full flex items-center justify-center transition-all duration-500 backdrop-blur-sm ${
-                    (isСвободноеОбщениеStage || questionCategories.evenCloser > 0)
+                    (isСближениеStage || isГлавныйВопросStage || isСвободноеОбщениеStage || questionCategories.evenCloser > 0)
                       ? 'bg-gradient-to-br from-purple-500 via-indigo-500 to-purple-600 text-white shadow-lg shadow-purple-500/50 hover:shadow-2xl hover:shadow-purple-500/60 hover:-translate-y-1 active:scale-95'
                       : 'bg-gray-200/80 text-gray-400 cursor-not-allowed'
                   }`}
                   style={{
-                    transform: (isСвободноеОбщениеStage || questionCategories.evenCloser > 0) ? 'rotateY(0deg)' : 'rotateY(0deg)',
+                    transform: (isСближениеStage || isГлавныйВопросStage || isСвободноеОбщениеStage || questionCategories.evenCloser > 0) ? 'rotateY(0deg)' : 'rotateY(0deg)',
                     transition: 'all 0.5s cubic-bezier(0.34, 1.56, 0.64, 1)'
                   }}
                   onMouseEnter={(e) => {
-                    if (isСвободноеОбщениеStage || questionCategories.evenCloser > 0) {
+                    if (isСближениеStage || isГлавныйВопросStage || isСвободноеОбщениеStage || questionCategories.evenCloser > 0) {
                       e.currentTarget.style.transform = 'rotateY(15deg) translateY(-4px) scale(1.1)';
                     }
                   }}
@@ -1559,12 +1926,12 @@ export function Messages({ chatMatch, mutualMatches, onSelectMatch, onCloseChat 
                     e.currentTarget.style.transform = 'rotateY(0deg) translateY(0px) scale(1)';
                   }}
                 >
-                  <Sparkles className={`w-5 h-5 ${(isСвободноеОбщениеStage || questionCategories.evenCloser > 0) ? 'drop-shadow-lg' : ''}`} />
-                  {(isСвободноеОбщениеStage || questionCategories.evenCloser > 0) && (
+                  <Sparkles className={`w-5 h-5 ${(isСближениеStage || isГлавныйВопросStage || isСвободноеОбщениеStage || questionCategories.evenCloser > 0) ? 'drop-shadow-lg' : ''}`} />
+                  {(isСближениеStage || isГлавныйВопросStage || isСвободноеОбщениеStage || questionCategories.evenCloser > 0) && (
                     <div className="absolute inset-0 rounded-full bg-white/20 animate-ping opacity-75"></div>
                   )}
                 </button>
-                {(isСвободноеОбщениеStage || questionCategories.evenCloser > 0) && (
+                {(isСближениеStage || isГлавныйВопросStage || isСвободноеОбщениеStage || questionCategories.evenCloser > 0) && (
                   <div className="absolute inset-0 rounded-full bg-purple-400 blur-xl opacity-30 group-hover:opacity-50 transition-opacity duration-300"></div>
                 )}
               </div>
@@ -1576,16 +1943,16 @@ export function Messages({ chatMatch, mutualMatches, onSelectMatch, onCloseChat 
                   onClick={() => handleAskQuestion('innerWorld')}
                   data-tooltip="Внутренний мир"
                   className={`tooltip-trigger relative z-10 w-12 h-12 rounded-full flex items-center justify-center transition-all duration-500 backdrop-blur-sm ${
-                    (isСвободноеОбщениеStage || questionCategories.innerWorld > 0)
+                    (isСближениеStage || isГлавныйВопросStage || isСвободноеОбщениеStage || questionCategories.innerWorld > 0)
                       ? 'bg-gradient-to-br from-indigo-500 via-blue-500 to-indigo-600 text-white shadow-lg shadow-indigo-500/50 hover:shadow-2xl hover:shadow-indigo-500/60 hover:-translate-y-1 active:scale-95'
                       : 'bg-gray-200/80 text-gray-400 cursor-not-allowed'
                   }`}
                   style={{
-                    transform: (isСвободноеОбщениеStage || questionCategories.innerWorld > 0) ? 'rotateY(0deg)' : 'rotateY(0deg)',
+                    transform: (isСближениеStage || isГлавныйВопросStage || isСвободноеОбщениеStage || questionCategories.innerWorld > 0) ? 'rotateY(0deg)' : 'rotateY(0deg)',
                     transition: 'all 0.5s cubic-bezier(0.34, 1.56, 0.64, 1)'
                   }}
                   onMouseEnter={(e) => {
-                    if (isСвободноеОбщениеStage || questionCategories.innerWorld > 0) {
+                    if (isСближениеStage || isГлавныйВопросStage || isСвободноеОбщениеStage || questionCategories.innerWorld > 0) {
                       e.currentTarget.style.transform = 'rotateY(15deg) translateY(-4px) scale(1.1)';
                     }
                   }}
@@ -1593,12 +1960,12 @@ export function Messages({ chatMatch, mutualMatches, onSelectMatch, onCloseChat 
                     e.currentTarget.style.transform = 'rotateY(0deg) translateY(0px) scale(1)';
                   }}
                 >
-                  <Brain className={`w-5 h-5 ${(isСвободноеОбщениеStage || questionCategories.innerWorld > 0) ? 'drop-shadow-lg' : ''}`} />
-                  {(isСвободноеОбщениеStage || questionCategories.innerWorld > 0) && (
+                  <Brain className={`w-5 h-5 ${(isСближениеStage || isГлавныйВопросStage || isСвободноеОбщениеStage || questionCategories.innerWorld > 0) ? 'drop-shadow-lg' : ''}`} />
+                  {(isСближениеStage || isГлавныйВопросStage || isСвободноеОбщениеStage || questionCategories.innerWorld > 0) && (
                     <div className="absolute inset-0 rounded-full bg-white/20 animate-ping opacity-75"></div>
                   )}
                 </button>
-                {(isСвободноеОбщениеStage || questionCategories.innerWorld > 0) && (
+                {(isСближениеStage || isГлавныйВопросStage || isСвободноеОбщениеStage || questionCategories.innerWorld > 0) && (
                   <div className="absolute inset-0 rounded-full bg-indigo-400 blur-xl opacity-30 group-hover:opacity-50 transition-opacity duration-300"></div>
                 )}
               </div>
@@ -1646,42 +2013,636 @@ export function Messages({ chatMatch, mutualMatches, onSelectMatch, onCloseChat 
         <ProfileModal match={chatMatch} onClose={() => setShowProfileModal(false)} />
       )}
 
-      {/* Stage Menu Modal */}
-      {showStageMenu && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full p-6 space-y-4 animate-in fade-in zoom-in duration-300">
-            <div className="flex items-center justify-between border-b border-gray-200 pb-4">
-              <h3 className="text-2xl text-gray-900">Переход к этапу</h3>
+      {/* Matched Questions Modal */}
+      {showMatchedQuestionsModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-3xl shadow-2xl max-w-2xl w-full max-h-[80vh] overflow-hidden animate-in fade-in zoom-in duration-300">
+            <div className="bg-gradient-to-r from-pink-500 via-rose-500 to-red-500 p-6">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center">
+                    <span className="text-2xl">💖</span>
+                  </div>
+                  <div>
+                    <h2 className="text-2xl text-white">Наши совпадения</h2>
+                    <p className="text-sm text-white/80">Вопросы, где ваши ответы совпали</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowMatchedQuestionsModal(false)}
+                  className="w-10 h-10 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center transition-all duration-300"
+                >
+                  <X className="w-6 h-6 text-white" />
+                </button>
+              </div>
+            </div>
+            
+            <div className="p-6 overflow-y-auto max-h-[calc(80vh-120px)]">
+              {matchedQuestions.length === 0 ? (
+                <div className="text-center py-12 text-gray-500">
+                  <span className="text-4xl mb-4 block">🤍</span>
+                  <p>Пока нет совпадений</p>
+                  <p className="text-sm mt-2">Отвечайте на вопросы, чтобы найти общее!</p>
+                </div>
+              ) : (
+                <div className="space-y-6">
+                  {matchedQuestions.map((item, index) => (
+                    <div
+                      key={item.id}
+                      className="bg-gradient-to-br from-pink-50 to-rose-50 rounded-2xl p-5 border border-pink-200 shadow-sm hover:shadow-md transition-all duration-300"
+                    >
+                      <div className="flex items-start gap-3 mb-4">
+                        <div className="w-8 h-8 rounded-full bg-gradient-to-r from-pink-500 to-rose-500 flex items-center justify-center flex-shrink-0">
+                          <span className="text-white text-sm">{index + 1}</span>
+                        </div>
+                        <p className="text-gray-800 flex-1 pt-1">
+                          {item.question}
+                        </p>
+                      </div>
+                      
+                      <div className="space-y-3 ml-11">
+                        <div className="bg-white/70 backdrop-blur-sm rounded-xl p-3 border border-emerald-200">
+                          <p className="text-xs text-emerald-700 mb-1">Ваш ответ:</p>
+                          <p className="text-sm text-gray-800">{item.myAnswer}</p>
+                        </div>
+                        
+                        <div className="bg-white/70 backdrop-blur-sm rounded-xl p-3 border border-blue-200">
+                          <p className="text-xs text-blue-700 mb-1">Ответ собеседника:</p>
+                          <p className="text-sm text-gray-800">{item.theirAnswer}</p>
+                        </div>
+                        
+                        <div className="flex items-center justify-center gap-2 pt-2">
+                          <div className="h-px flex-1 bg-gradient-to-r from-transparent via-pink-300 to-transparent"></div>
+                          <span className="text-pink-600 text-sm">✨ Совпадение!</span>
+                          <div className="h-px flex-1 bg-gradient-to-r from-transparent via-pink-300 to-transparent"></div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            
+            <div className="p-6 border-t border-gray-200 bg-gray-50">
               <button
-                onClick={() => setShowStageMenu(false)}
-                className="w-8 h-8 rounded-full hover:bg-gray-100 flex items-center justify-center transition-all duration-300"
+                onClick={() => setShowMatchedQuestionsModal(false)}
+                className="w-full py-3 bg-gradient-to-r from-pink-600 to-rose-600 text-white rounded-xl hover:shadow-lg transition-all duration-300 hover:scale-105"
               >
-                <X className="w-5 h-5 text-gray-500" />
+                Закрыть
               </button>
             </div>
+          </div>
+        </div>
+      )}
 
-            <div className="space-y-2">
-              {stages.map((stage) => (
-                <button
-                  key={stage}
-                  onClick={() => handleJumpToStage(stage)}
-                  className={`w-full py-4 px-5 rounded-2xl transition-all duration-300 text-left flex items-center justify-between ${
-                    stage === currentStage
-                      ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-lg scale-105'
-                      : 'bg-gray-50 hover:bg-gray-100 text-gray-700 hover:scale-102'
-                  }`}
-                >
-                  <span className="text-lg">{stage}</span>
-                  {stage === currentStage && (
-                    <Check className="w-6 h-6" />
-                  )}
-                </button>
-              ))}
+      {/* Stage Transition Modal */}
+      {showStageTransitionModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-3xl shadow-2xl max-w-lg w-full p-8 space-y-6 animate-in fade-in zoom-in duration-300">
+            <div className="text-center space-y-4">
+              <div className="w-20 h-20 mx-auto bg-gradient-to-br from-emerald-500 to-teal-500 rounded-full flex items-center justify-center">
+                <span className="text-4xl">✨</span>
+              </div>
+              <h2 className="text-3xl bg-gradient-to-r from-emerald-600 to-teal-600 bg-clip-text text-transparent">
+                Этап "{transitionStageName}"
+              </h2>
             </div>
 
-            <p className="text-xs text-gray-500 text-center pt-2">
-              Переход на любой этап без условий (для тестирования)
-            </p>
+            <div className="space-y-4 text-gray-700">
+              {transitionStageName === 'Знакомство' && (
+                <>
+                  <p className="text-center leading-relaxed">
+                    Добро пожаловать в эксперимент! Вы начинаете этап <span className="font-semibold text-emerald-600">Знакомство</span>.
+                  </p>
+                  
+                  <div className="bg-emerald-50 border-l-4 border-emerald-500 p-4 rounded-r-lg">
+                    <p className="text-sm">
+                      <span className="font-semibold">👋 Суть этапа:</span> Познакомьтесь друг с другом в свободной переписке. Расскажите о себе, узнайте собеседника, найдите общие темы.
+                    </p>
+                  </div>
+
+                  <div className="bg-blue-50 border-l-4 border-blue-500 p-4 rounded-r-lg">
+                    <p className="text-sm">
+                      <span className="font-semibold">⚡ Правило одного чата:</span> Вы можете общаться только с одним человеком одновременно. Это помогает сосредоточиться на качестве общения, а не на количестве.
+                    </p>
+                  </div>
+
+                  <p className="text-center text-sm text-gray-600">
+                    У вас есть <span className="font-semibold">5 сообщений</span> на двоих на этом этапе. Используйте их мудро!
+                  </p>
+                </>
+              )}
+
+              {transitionStageName === 'Интуиция' && (
+                <>
+                  <p className="text-center leading-relaxed">
+                    Вы познакомились друг с другом! Теперь начинается этап <span className="font-semibold text-emerald-600">Интуиция</span>.
+                  </p>
+                  
+                  <div className="bg-emerald-50 border-l-4 border-emerald-500 p-4 rounded-r-lg">
+                    <p className="text-sm">
+                      <span className="font-semibold">💡 Суть этапа:</span> Вы будете угадывать ответы друг друга на вопросы. Это поможет узнать, насколько вы чувствуете собеседника.
+                    </p>
+                  </div>
+
+                  <div className="bg-blue-50 border-l-4 border-blue-500 p-4 rounded-r-lg">
+                    <p className="text-sm">
+                      <span className="font-semibold">📋 Как это работает:</span>
+                    </p>
+                    <ul className="text-sm mt-2 space-y-1 list-disc list-inside">
+                      <li>Кликните по вопросу, чтобы выбрать свой ответ</li>
+                      <li>Попробуйте угадать ответ собеседника</li>
+                      <li>Сравните результаты — совпали ли ваши догадки?</li>
+                    </ul>
+                  </div>
+
+                  <p className="text-center text-sm text-gray-600">
+                    У вас есть <span className="font-semibold">5 сообщений</span> и <span className="font-semibold">5 вопросов</span> на этом этапе.
+                  </p>
+                </>
+              )}
+
+              {transitionStageName === 'Сближение' && (
+                <>
+                  <p className="text-center leading-relaxed">
+                    Ваша интуиция проверена! Переходим к этапу <span className="font-semibold text-emerald-600">Сближение</span>.
+                  </p>
+                  
+                  <div className="bg-emerald-50 border-l-4 border-emerald-500 p-4 rounded-r-lg">
+                    <p className="text-sm">
+                      <span className="font-semibold">💚 Суть этапа:</span> Глубокие вопросы на основе исследования 36 вопросов Артура Арона. Они помогут вам узнать друг друга на более личном уровне.
+                    </p>
+                  </div>
+
+                  <div className="bg-purple-50 border-l-4 border-purple-500 p-4 rounded-r-lg">
+                    <p className="text-sm">
+                      <span className="font-semibold">🎯 Три категории вопросов:</span>
+                    </p>
+                    <ul className="text-sm mt-2 space-y-1 list-disc list-inside">
+                      <li><strong>Быть ближе</strong> — познавательные вопросы</li>
+                      <li><strong>Ещё ближе</strong> — более личные вопросы</li>
+                      <li><strong>Внутренний мир</strong> — глубокие вопросы о себе</li>
+                    </ul>
+                  </div>
+
+                  <p className="text-center text-sm text-gray-600">
+                    У вас есть <span className="font-semibold">5 сообщений</span> и <span className="font-semibold">по 5 вопросов</span> каждой категории.
+                  </p>
+                </>
+              )}
+            </div>
+
+            <button
+              onClick={handleStageTransitionClose}
+              className="w-full py-4 bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-2xl hover:shadow-lg transition-all duration-300 hover:scale-105 text-lg"
+            >
+              Начать этап ✨
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Main Question Intro Modal */}
+      {showMainQuestionIntro && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-3xl shadow-2xl max-w-lg w-full p-8 space-y-6 animate-in fade-in zoom-in duration-300">
+            <div className="text-center space-y-4">
+              <h2 className="text-3xl bg-gradient-to-r from-rose-600 to-pink-600 bg-clip-text text-transparent">
+                Этап "Главный вопрос"
+              </h2>
+            </div>
+
+            <div className="space-y-4 text-gray-700">
+              <p className="text-center leading-relaxed">
+                Вы дошли до ключевого мо��ента эксперимента. Сейчас запустится визуальный <span className="font-semibold text-rose-600">таймер на 3 суток</span>.
+              </p>
+              
+              <p className="text-sm">
+                <span className="font-semibold">⚠️ Важно:</span> После истечения времени появится окно с главным вопросом. На него можно ответить только <span className="font-semibold">ДА</span> или <span className="font-semibold">НЕТ</span>.
+              </p>
+              
+              <p className="text-sm font-semibold text-rose-700">
+                Если хотя бы один из вас ответит "НЕТ" — чат будет безвозвратно удалён, а вы исчезнете из списков друг друга. Возможно, вы встретитесь снова.
+              </p>
+
+              <p className="text-sm">
+                💡 Вы можете в любой момент сами вызвать окно с главным вопросом, но для этого оба должны подтвердить готовность.
+              </p>
+
+              <p className="text-center text-sm text-gray-600">
+                Если прошло трое суток, окно с вопросом появится автоматически и закрыть его без ответа будет нельзя.
+              </p>
+            </div>
+
+            <button
+              onClick={handleMainQuestionIntroClose}
+              className="w-full py-4 bg-gradient-to-r from-rose-600 to-pink-600 text-white rounded-2xl hover:shadow-lg transition-all duration-300 hover:scale-105 text-lg"
+            >
+              Понятно, продолжить
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Partner Confirmation Modal */}
+      {showPartnerConfirmation && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full p-6 space-y-6 animate-in fade-in zoom-in duration-300">
+            <div className="text-center space-y-3">
+              <div className="w-14 h-14 mx-auto bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center">
+                <MessageSquare className="w-7 h-7 text-white" />
+              </div>
+              <h3 className="text-2xl text-gray-900">
+                Запрос от собеседника
+              </h3>
+              <p className="text-gray-600">
+                {chatMatch?.name} предлагает перейти к главному вопросу прямо сейчас. Вы готовы?
+              </p>
+            </div>
+
+            <div className="space-y-3">
+              <button
+                onClick={() => handlePartnerResponse(true)}
+                className="w-full py-3 bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-xl hover:shadow-lg transition-all duration-300 hover:scale-105"
+              >
+                Да, я готов(а)
+              </button>
+              <button
+                onClick={() => handlePartnerResponse(false)}
+                className="w-full py-3 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition-all duration-300"
+              >
+                Нет, пока не готов(а)
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Main Question Modal */}
+      {showMainQuestion && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-md flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-3xl shadow-2xl max-w-lg w-full p-8 space-y-6 animate-in fade-in zoom-in duration-300">
+            <div className="text-center space-y-4">
+              <h2 className="text-3xl bg-gradient-to-r from-rose-600 via-pink-600 to-purple-600 bg-clip-text text-transparent">
+                Главный вопрос
+              </h2>
+            </div>
+
+            <div className="space-y-4">
+              <p className="text-xl text-center text-gray-800 leading-relaxed">
+                Хотите ли вы встретиться с <span className="font-semibold text-rose-600">{chatMatch?.name}</span> в реальной жизни?
+              </p>
+            </div>
+
+            {/* Test controls - for development */}
+            <div className="bg-yellow-50 border border-yellow-300 rounded-xl p-4 space-y-3">
+              <p className="text-xs text-yellow-800 font-semibold">🧪 Тестовые настройки:</p>
+              
+              <div className="space-y-2">
+                <label className="block text-xs text-gray-700">
+                  Ответ собеседника:
+                </label>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setTestPartnerAnswer('yes')}
+                    className={`flex-1 px-3 py-2 text-xs rounded-lg transition-all ${
+                      testPartnerAnswer === 'yes'
+                        ? 'bg-emerald-500 text-white'
+                        : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50'
+                    }`}
+                  >
+                    ДА
+                  </button>
+                  <button
+                    onClick={() => setTestPartnerAnswer('no')}
+                    className={`flex-1 px-3 py-2 text-xs rounded-lg transition-all ${
+                      testPartnerAnswer === 'no'
+                        ? 'bg-red-500 text-white'
+                        : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50'
+                    }`}
+                  >
+                    НЕТ
+                  </button>
+                  <button
+                    onClick={() => setTestPartnerAnswer(null)}
+                    className={`flex-1 px-3 py-2 text-xs rounded-lg transition-all ${
+                      testPartnerAnswer === null
+                        ? 'bg-gray-500 text-white'
+                        : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50'
+                    }`}
+                  >
+                    Случайно
+                  </button>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="block text-xs text-gray-700">
+                  Контакты собеседни��а:
+                </label>
+                <input
+                  type="text"
+                  value={partnerContactInfo}
+                  onChange={(e) => setPartnerContactInfo(e.target.value)}
+                  placeholder="@partner_telegram, +7 900 000-00-00"
+                  className="w-full px-3 py-2 text-xs border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-500"
+                />
+              </div>
+            </div>
+
+            {mainQuestionAnswers.myAnswer === null ? (
+              <div className="space-y-3">
+                <p className="text-center text-sm text-gray-600">
+                  Выберите ваш ответ:
+                </p>
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => handleMainQuestionAnswer('yes')}
+                    className="flex-1 py-4 bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-2xl hover:shadow-lg transition-all duration-300 hover:scale-105 text-lg font-semibold"
+                  >
+                    ДА ✓
+                  </button>
+                  <button
+                    onClick={() => handleMainQuestionAnswer('no')}
+                    className="flex-1 py-4 bg-gradient-to-r from-red-600 to-rose-600 text-white rounded-2xl hover:shadow-lg transition-all duration-300 hover:scale-105 text-lg font-semibold"
+                  >
+                    НЕТ ✗
+                  </button>
+                </div>
+              </div>
+            ) : showContactInput ? (
+              <div className="space-y-4">
+                <div className="bg-emerald-50 border border-emerald-200 p-4 rounded-xl">
+                  <p className="text-emerald-700 text-center">
+                    Ваш ответ: <span className="font-semibold">{mainQuestionAnswers.myAnswer === 'yes' ? 'ДА ✓' : 'НЕТ ✗'}</span>
+                  </p>
+                </div>
+
+                <div className="space-y-3">
+                  <label className="block text-sm text-gray-700 font-medium">
+                    Введите ваши контактные данные:
+                  </label>
+                  <textarea
+                    value={contactInfo}
+                    onChange={(e) => setContactInfo(e.target.value)}
+                    placeholder="Например: +7 900 123-45-67, @username в Telegram"
+                    className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 resize-none"
+                    rows={3}
+                    autoFocus
+                  />
+                </div>
+
+                <button
+                  onClick={handleContactInfoSubmit}
+                  disabled={!contactInfo.trim()}
+                  className={`w-full py-4 rounded-2xl transition-all duration-300 text-lg font-semibold ${
+                    contactInfo.trim()
+                      ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white hover:shadow-lg hover:scale-105'
+                      : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                  }`}
+                >
+                  Отправить ответ
+                </button>
+              </div>
+            ) : (
+              <div className="text-center space-y-3">
+                <div className="bg-emerald-50 border border-emerald-200 p-4 rounded-xl">
+                  <p className="text-emerald-700">
+                    Ваш ответ: <span className="font-semibold">{mainQuestionAnswers.myAnswer === 'yes' ? 'ДА' : 'НЕТ'}</span>
+                  </p>
+                </div>
+                <div className="flex items-center justify-center gap-2 text-gray-600">
+                  <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce"></div>
+                  <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                  <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                  <p className="ml-2">Ждём ответа собеседника...</p>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Success Modal */}
+      {showSuccessModal && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-md flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-3xl shadow-2xl max-w-lg w-full p-8 space-y-6 animate-in fade-in zoom-in duration-300">
+            <div className="text-center space-y-4">
+              <div className="w-20 h-20 mx-auto bg-gradient-to-br from-emerald-500 to-teal-600 rounded-full flex items-center justify-center">
+                <Check className="w-12 h-12 text-white" />
+              </div>
+              <h2 className="text-3xl bg-gradient-to-r from-emerald-600 to-teal-600 bg-clip-text text-transparent">
+                Поздравляем! 🎉
+              </h2>
+              <p className="text-gray-700 text-lg">
+                Вы оба ответили "ДА"! Это замечательны�� результат эксперимента.
+              </p>
+            </div>
+
+            {/* Partner's contact info */}
+            {partnerContactInfo && (
+              <div className="bg-emerald-50 border border-emerald-300 rounded-xl p-4 space-y-2">
+                <p className="text-sm font-semibold text-emerald-800">
+                  📱 Контакты {chatMatch?.name}:
+                </p>
+                <p className="text-gray-800 break-words">
+                  {partnerContactInfo}
+                </p>
+              </div>
+            )}
+
+            <div className="space-y-3">
+              <div className="bg-blue-50 border-l-4 border-blue-500 p-4 rounded-r-lg">
+                <p className="text-sm text-blue-900">
+                  <span className="font-semibold">📍 Следующий этап: "Свидание"</span><br />
+                  Договоритесь о встрече через телефон или соцсети, используя контактные данные выше.
+                </p>
+              </div>
+
+              <div className="bg-amber-50 border-l-4 border-amber-500 p-4 rounded-r-lg space-y-2">
+                <p className="text-sm font-semibold text-amber-900">
+                  ⚠️ Важно: Этап "Свидание" — только для встречи
+                </p>
+                <ul className="text-sm text-amber-800 space-y-1 list-disc list-inside">
+                  <li>На этапе "Свидание" нет чата — только вопросы для встречи</li>
+                  <li>До свидания общайтесь через другие приложения, но постарайтесь свести общение к минимуму</li>
+                  <li>Переходите к этапу только ВО ВРЕМЯ встречи</li>
+                  <li>Будьте в спокойном состоянии и готовы отвечать на вопросы</li>
+                </ul>
+              </div>
+            </div>
+
+            <button
+              onClick={handleSuccessModalContinue}
+              className="w-full py-4 rounded-2xl transition-all duration-300 text-lg font-semibold bg-gradient-to-r from-emerald-600 to-teal-600 text-white hover:shadow-lg hover:scale-105"
+            >
+              Понятно, продолжаем
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Chat Modal */}
+      {showDeleteChatModal && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-md flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full p-8 space-y-6 animate-in fade-in zoom-in duration-300">
+            <div className="text-center space-y-4">
+              <div className="w-16 h-16 mx-auto bg-gradient-to-br from-red-500 to-rose-600 rounded-full flex items-center justify-center">
+                <Trash2 className="w-8 h-8 text-white" />
+              </div>
+              <h2 className="text-2xl text-gray-900">
+                Удалить чат?
+              </h2>
+            </div>
+
+            <div className="space-y-4">
+              <div className="bg-amber-50 border-l-4 border-amber-500 p-5 rounded-r-lg space-y-2">
+                <p className="text-gray-700">
+                  <strong>💬 Попрощались ли вы с собеседником?</strong>
+                </p>
+                <p className="text-sm text-gray-600">
+                  Желательно отправить прощальное сообщение перед удалением чата. Молчаливый уход может ранить сильнее, чем честный отказ.
+                </p>
+              </div>
+
+              <div className="bg-blue-50 border-l-4 border-blue-500 p-5 rounded-r-lg space-y-2">
+                <p className="text-gray-700">
+                  <strong>✨ Оставьте обратную связь собеседнику</strong>
+                </p>
+                <p className="text-sm text-gray-600">
+                  Конструктивная обратная связь — бесценный дар для саморазвития. То, что для вас очевидно, может быть открытием для другого человека. Ваши слова могут помочь ему стать лучше не только в знакомствах, но и в жизни.
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-sm text-gray-700 mb-2">
+                  Обратная связь для собеседника (опционально)
+                </label>
+                <textarea
+                  value={deleteReason}
+                  onChange={(e) => setDeleteReason(e.target.value)}
+                  placeholder="Напишите, что можно улучшить... Это будет передано собеседнику."
+                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 resize-none"
+                  rows={4}
+                />
+              </div>
+
+              <div className="bg-red-50 border-l-4 border-red-500 p-4 rounded-r-lg">
+                <p className="text-gray-700 text-center text-sm">
+                  ⚠️ Это действие безвозвратно удалит чат, а вы исчезнете из списков друг друга.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => {
+                  setShowDeleteChatModal(false);
+                  setDeleteReason('');
+                }}
+                className="flex-1 py-4 bg-gray-100 text-gray-700 rounded-2xl hover:bg-gray-200 transition-all duration-300"
+              >
+                Отмена
+              </button>
+              <button
+                onClick={handleConfirmDeleteChat}
+                className="flex-1 py-4 bg-gradient-to-r from-red-600 to-rose-600 text-white rounded-2xl hover:shadow-lg transition-all duration-300 hover:scale-105"
+              >
+                Удалить
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Partner Delete Notification Modal (for testing) */}
+      {showPartnerDeleteNotification && partnerDeleteInfo && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-md flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full p-8 space-y-6 animate-in fade-in zoom-in duration-300">
+            <div className="text-center space-y-4">
+              <div className="w-16 h-16 mx-auto bg-gradient-to-br from-gray-400 to-gray-600 rounded-full flex items-center justify-center">
+                <X className="w-8 h-8 text-white" />
+              </div>
+              <h2 className="text-2xl text-gray-900">
+                Чат удалён
+              </h2>
+            </div>
+
+            <div className="bg-gradient-to-r from-emerald-50 to-teal-50 border-l-4 border-emerald-500 p-5 rounded-r-lg space-y-3">
+              <p className="text-gray-700">
+                <strong>Собеседник удалил чат.</strong> Вы ��ольше не отображаетесь в списках друг друга.
+              </p>
+              <p className="text-sm text-gray-600">
+                💚 Всё в порядке! Лучше быстро понять, что вы не подходите друг другу, чем тратить время на отношения без искры. Впереди ещё много интересных людей и новых возможностей!
+              </p>
+            </div>
+
+            {partnerDeleteInfo.sharedFeedback && partnerDeleteInfo.reason && (
+              <div className="bg-blue-50 border border-blue-200 p-4 rounded-xl">
+                <p className="text-sm text-blue-900 mb-2">
+                  <strong>Обратная связь от собеседника:</strong>
+                </p>
+                <p className="text-sm text-gray-700">
+                  {partnerDeleteInfo.reason}
+                </p>
+              </div>
+            )}
+
+            {(!partnerDeleteInfo.sharedFeedback || !partnerDeleteInfo.reason) && (
+              <div className="bg-purple-50 border border-purple-200 p-4 rounded-xl">
+                <p className="text-sm text-purple-900 text-center">
+                  ✨ Каждая встреча — это опыт. Двигайтесь дальше с лёгким сердцем!
+                </p>
+              </div>
+            )}
+
+            <button
+              onClick={handlePartnerDeleteNotificationClose}
+              className="w-full py-4 bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-2xl hover:shadow-lg transition-all duration-300 hover:scale-105"
+            >
+              Продолжить знакомства ✨
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Rejection Modal */}
+      {showRejectionModal && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-md flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full p-8 space-y-6 animate-in fade-in zoom-in duration-300">
+            <div className="text-center space-y-4">
+              <div className="w-16 h-16 mx-auto bg-gradient-to-br from-gray-400 to-gray-600 rounded-full flex items-center justify-center">
+                <X className="w-8 h-8 text-white" />
+              </div>
+              <h2 className="text-2xl text-gray-900">
+                К сожалению...
+              </h2>
+            </div>
+
+            <div className="bg-gray-50 border-l-4 border-gray-400 p-5 rounded-r-lg">
+              <p className="text-gray-700 text-center">
+                {mainQuestionAnswers.theirAnswer === 'no' 
+                  ? 'Собеседник ответил "НЕТ" на главный вопрос.'
+                  : 'Вы ответили "НЕТ" на главный вопрос.'
+                }
+              </p>
+              <p className="text-gray-600 text-center mt-3 text-sm">
+                Согласно правилам эксперимента, чат будет удалён.
+              </p>
+            </div>
+
+            <div className="bg-gradient-to-r from-emerald-50 to-teal-50 border-l-4 border-emerald-500 p-4 rounded-xl">
+              <p className="text-sm text-gray-700">
+                💚 Честность — это смелость! Лучше признать несовместимость сейчас, чем жалеть об упущенном времени потом. Вы оба сделали правильный выбор для себя.
+              </p>
+            </div>
+
+            <button
+              onClick={handleChatDeletion}
+              className="w-full py-4 bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-2xl hover:shadow-lg transition-all duration-300 hover:scale-105"
+            >
+              Продолжить эксперимент ✨
+            </button>
           </div>
         </div>
       )}

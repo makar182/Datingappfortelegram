@@ -64,14 +64,16 @@ export function ProfileForm({ user, onSave, onCancel, onEdit, isFirstTime = fals
   const parseBioPrompts = (bio?: string) => {
     const prompts: any = {
       // Группа "О Вас"
-      inspiration: '',
-      morning: '',
-      emotions: '',
-      dreams: '',
-      closeness: '',
-      expression: '',
-      values: '',
-      perfect_day: '',
+      free_year: '',
+      small_moment: '',
+      spontaneous_or_planned: '',
+      accidental_skill: '',
+      cozy_or_adventure: '',
+      funny_memory: '',
+      praise_and_jokes: '',
+      important_detail: '',
+      recovery_method: '',
+      favorite_question: '',
       // Группа "Ваше мнение о..." - Деньги
       money_paying: '',
       money_split: '',
@@ -110,22 +112,26 @@ export function ProfileForm({ user, onSave, onCancel, onEdit, isFirstTime = fals
     const sections = bio.split('\n\n');
     sections.forEach(section => {
       // Группа "О Вас"
-      if (section.includes('💭 Что меня вдохновляет:')) {
-        prompts.inspiration = section.replace('💭 Что меня вдохновляет:\n', '');
-      } else if (section.includes('🌅 Мое идеальное утро:')) {
-        prompts.morning = section.replace('🌅 Мое идеальное утро:\n', '');
-      } else if (section.includes('🎭 Что меня трогает:')) {
-        prompts.emotions = section.replace('🎭 Что меня трогает:\n', '');
-      } else if (section.includes('🌌 Мои мечты:')) {
-        prompts.dreams = section.replace('🌌 Мои мечты:\n', '');
-      } else if (section.includes('💫 Близость для меня:')) {
-        prompts.closeness = section.replace('💫 Близость для меня:\n', '');
-      } else if (section.includes('🎨 Как я выражаю себя:')) {
-        prompts.expression = section.replace('🎨 Как я выражаю себя:\n', '');
-      } else if (section.includes('⭐ Мои ценности:')) {
-        prompts.values = section.replace('⭐ Мои ценности:\n', '');
-      } else if (section.includes('☀️ Идеальный день:')) {
-        prompts.perfect_day = section.replace('☀️ Идеальный день:\n', '');
+      if (section.includes('🌍 Свободный год:')) {
+        prompts.free_year = section.replace('🌍 Свободный год:\n', '');
+      } else if (section.includes('✨ Маленький момент:')) {
+        prompts.small_moment = section.replace('✨ Маленький момент:\n', '');
+      } else if (section.includes('🎲 Спонтанность или планирование:')) {
+        prompts.spontaneous_or_planned = section.replace('🎲 Спонтанность или планирование:\n', '');
+      } else if (section.includes('🎯 Случайный навык:')) {
+        prompts.accidental_skill = section.replace('🎯 Случайный навык:\n', '');
+      } else if (section.includes('🏡 Уют или приключение:')) {
+        prompts.cozy_or_adventure = section.replace('🏡 Уют или приключение:\n', '');
+      } else if (section.includes('😄 Смешная история:')) {
+        prompts.funny_memory = section.replace('😄 Смешная история:\n', '');
+      } else if (section.includes('👥 Хвалят и подшучивают:')) {
+        prompts.praise_and_jokes = section.replace('👥 Хвалят и подшучивают:\n', '');
+      } else if (section.includes('🔍 Важная мелочь:')) {
+        prompts.important_detail = section.replace('🔍 Важная мелочь:\n', '');
+      } else if (section.includes('🌙 Восстановление:')) {
+        prompts.recovery_method = section.replace('🌙 Восстановление:\\n', '');
+      } else if (section.includes('💬 Любимый вопрос:')) {
+        prompts.favorite_question = section.replace('💬 Любимый вопрос:\\n', '');
       }
       // Деньги
       else if (section.includes('💰 Оплата в отношениях:')) {
@@ -215,29 +221,35 @@ export function ProfileForm({ user, onSave, onCancel, onEdit, isFirstTime = fals
     const bioSections = [];
     
     // Группа "О Вас"
-    if (bioPrompts.inspiration) {
-      bioSections.push(`💭 Что меня вдохновляет:\n${bioPrompts.inspiration}`);
+    if (bioPrompts.free_year) {
+      bioSections.push(`🌍 Свободный год:\n${bioPrompts.free_year}`);
     }
-    if (bioPrompts.morning) {
-      bioSections.push(`🌅 Мое идеальное утро:\n${bioPrompts.morning}`);
+    if (bioPrompts.small_moment) {
+      bioSections.push(`✨ Маленький момент:\n${bioPrompts.small_moment}`);
     }
-    if (bioPrompts.emotions) {
-      bioSections.push(`🎭 Что меня трогает:\n${bioPrompts.emotions}`);
+    if (bioPrompts.spontaneous_or_planned) {
+      bioSections.push(`🎲 Спонтанность или планирование:\n${bioPrompts.spontaneous_or_planned}`);
     }
-    if (bioPrompts.dreams) {
-      bioSections.push(`🌌 Мои мечты:\n${bioPrompts.dreams}`);
+    if (bioPrompts.accidental_skill) {
+      bioSections.push(`🎯 Случайный навык:\n${bioPrompts.accidental_skill}`);
     }
-    if (bioPrompts.closeness) {
-      bioSections.push(`💫 Близость для меня:\n${bioPrompts.closeness}`);
+    if (bioPrompts.cozy_or_adventure) {
+      bioSections.push(`🏡 Уют или приключение:\n${bioPrompts.cozy_or_adventure}`);
     }
-    if (bioPrompts.expression) {
-      bioSections.push(`🎨 Как я выражаю себя:\n${bioPrompts.expression}`);
+    if (bioPrompts.funny_memory) {
+      bioSections.push(`😄 Смешная история:\n${bioPrompts.funny_memory}`);
     }
-    if (bioPrompts.values) {
-      bioSections.push(`⭐ Мои ценности:\n${bioPrompts.values}`);
+    if (bioPrompts.praise_and_jokes) {
+      bioSections.push(`👥 Хвалят и подшучивают:\n${bioPrompts.praise_and_jokes}`);
     }
-    if (bioPrompts.perfect_day) {
-      bioSections.push(`☀️ Идеальный день:\n${bioPrompts.perfect_day}`);
+    if (bioPrompts.important_detail) {
+      bioSections.push(`🔍 Важная мелочь:\n${bioPrompts.important_detail}`);
+    }
+    if (bioPrompts.recovery_method) {
+      bioSections.push(`🌙 Восстановление:\\n${bioPrompts.recovery_method}`);
+    }
+    if (bioPrompts.favorite_question) {
+      bioSections.push(`💬 Любимый вопрос:\\n${bioPrompts.favorite_question}`);
     }
 
     // Группа "Ваше мнение о..." - Деньги
@@ -344,52 +356,64 @@ export function ProfileForm({ user, onSave, onCancel, onEdit, isFirstTime = fals
   // Группа 1: О Вас
   const aboutYouQuestions = [
     {
-      key: 'inspiration',
-      icon: '💭',
-      question: 'Что вас вдохновляет?',
-      placeholder: 'Напишите о книгах, музыке, идеях, людях или местах, которые наполняют вас энергией...',
+      key: 'free_year',
+      icon: '🌍',
+      question: 'Если бы у тебя был свободный год без обязательств, чем бы ты его заполнил(а)?',
+      placeholder: 'Поделитесь своими мечтами и планами...',
     },
     {
-      key: 'morning',
-      icon: '🌅',
-      question: 'Идеальное утро для вас?',
-      placeholder: 'Опишите, как вы любите начинать день, что делает утро особен���ым...',
+      key: 'small_moment',
+      icon: '✨',
+      question: 'Какой маленький момент из обычной жизни делает твой день заметно лучше?',
+      placeholder: 'Расскажите о простых радостях...',
     },
     {
-      key: 'emotions',
-      icon: '🎭',
-      question: '��то вас по-настоящему трогает?',
-      placeholder: 'Моменты, которые вызывают сильные эмоции, заставляют задуматься или плакать...',
+      key: 'spontaneous_or_planned',
+      icon: '🎲',
+      question: 'Ты больше за спонтанные решения или за "я всё продумал(а) заранее"? Есть пример?',
+      placeholder: 'Поделитесь своим стилем принятия решений...',
     },
     {
-      key: 'dreams',
-      icon: '🌌',
-      question: 'О чем вы мечтаете?',
-      placeholder: 'Не цели и планы, а именно мечты — то, что живет в душе...',
+      key: 'accidental_skill',
+      icon: '🎯',
+      question: 'Какой навык или привычку ты однажды случайно приобрёл(а) — и теперь рад(а), что она с тобой?',
+      placeholder: 'Расскажите о неожиданном приобретении...',
     },
     {
-      key: 'closeness',
-      icon: '💫',
-      question: 'Что для вас значит близость?',
-      placeholder: 'В отношениях, дружбе, с самим собой...',
+      key: 'cozy_or_adventure',
+      icon: '🏡',
+      question: 'Если выбирать: уютный вечер дома или неожиданное приключение — что победит сегодня?',
+      placeholder: 'Что ближе вам в данный момент...',
     },
     {
-      key: 'expression',
-      icon: '🎨',
-      question: 'Как вы выражаете себя?',
-      placeholder: 'Творчество, общение, выбор, образ жизни...',
+      key: 'funny_memory',
+      icon: '😄',
+      question: 'Какая ситуация из жизни до сих пор вызывает улыбку, даже если тогда было не до смеха?',
+      placeholder: 'Поделитесь забавной историей...',
     },
     {
-      key: 'values',
-      icon: '⭐',
-      question: 'Какие ценности для вас важны?',
-      placeholder: 'Не абстракции, а то, как они проявляются в вашей жизни...',
+      key: 'praise_and_jokes',
+      icon: '👥',
+      question: 'За что тебя чаще всего хвалят друзья — и за что слегка подшучивают?',
+      placeholder: 'Расскажите о том, как вас видят близкие...',
     },
     {
-      key: 'perfect_day',
-      icon: '☀️',
-      question: 'Ваш идеальный день?',
-      placeholder: 'Если бы вы ��огли провести день как угодно, как бы он выглядел?',
+      key: 'important_detail',
+      icon: '🔍',
+      question: 'Есть ли у тебя мелочь, которую другие не понимают, а тебе она почему-то важна?',
+      placeholder: 'Что-то личное и важное для вас...',
+    },
+    {
+      key: 'recovery_method',
+      icon: '🌙',
+      question: 'Как ты обычно восстанавливаешься после сложного дня?',
+      placeholder: 'Расскажите о своих способах перезагрузки...',
+    },
+    {
+      key: 'favorite_question',
+      icon: '💬',
+      question: 'Какой вопрос ты сам(а) любишь задавать новым людям — и почему?',
+      placeholder: 'Поделитесь своим любимым вопросом...',
     },
   ];
 
@@ -528,7 +552,7 @@ export function ProfileForm({ user, onSave, onCancel, onEdit, isFirstTime = fals
         {
           key: 'bound_secrets',
           icon: '🔒',
-          question: 'Считаешь ли ты допустимым скрывать часть своей жизни от партнёра ради спокойствия?',
+          question: 'Считаешь ли ты допустимым скрыват�� часть своей жизни от партнёра ради спокойствия?',
           placeholder: 'Ваше мнение...',
         },
         {
@@ -589,7 +613,7 @@ export function ProfileForm({ user, onSave, onCancel, onEdit, isFirstTime = fals
   }, 0);
   const totalOpinionQuestions = opinionQuestions.reduce((count, section) => count + section.questions.length, 0);
 
-  // Режим просмотра профиля (не первый раз и не редактирование)
+  // Режим просмотра профиля (не первый раз и не редакти��ование)
   if (!isFirstTime && !isEditing && editSection === null) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white">
@@ -671,8 +695,8 @@ export function ProfileForm({ user, onSave, onCancel, onEdit, isFirstTime = fals
                 (() => {
                   const sections = (user.bio || '').split('\\n\\n').filter((s: string) => s.trim());
                   
-                  // Группа "О Вас" - первые 8 вопросов (по эмодзи)
-                  const aboutYouEmojis = ['💭', '🌅', '🎭', '🌌', '💫', '🎨', '⭐', '☀️'];
+                  // Группа "О Вас" - первые 10 вопросов (по эмодзи)
+                  const aboutYouEmojis = ['🌍', '✨', '🎲', '🎯', '🏡', '😄', '👥', '🔍', '🌙', '💬'];
                   const aboutYouSections = sections.filter((s: string) => {
                     const emoji = s.match(/[^\\w\\s:]/)?.[0];
                     return emoji && aboutYouEmojis.includes(emoji);
@@ -687,14 +711,14 @@ export function ProfileForm({ user, onSave, onCancel, onEdit, isFirstTime = fals
                   
                   const getBgGradient = (emoji: string) => {
                     const gradientMap: { [key: string]: string } = {
-                      '💭': 'from-blue-50 to-indigo-50 border-blue-200',
-                      '🌅': 'from-orange-50 to-amber-50 border-orange-200',
-                      '🎭': 'from-purple-50 to-pink-50 border-purple-200',
-                      '🌌': 'from-indigo-50 to-violet-50 border-indigo-200',
-                      '💫': 'from-pink-50 to-rose-50 border-pink-200',
-                      '🎨': 'from-emerald-50 to-teal-50 border-emerald-200',
-                      '⭐': 'from-yellow-50 to-amber-50 border-yellow-200',
-                      '☀️': 'from-amber-50 to-orange-50 border-amber-200',
+                      '🎵': 'from-blue-50 to-indigo-50 border-blue-200',
+                      '🍔': 'from-orange-50 to-amber-50 border-orange-200',
+                      '🎮': 'from-purple-50 to-pink-50 border-purple-200',
+                      '🌙': 'from-indigo-50 to-violet-50 border-indigo-200',
+                      '🎬': 'from-pink-50 to-rose-50 border-pink-200',
+                      '🎪': 'from-emerald-50 to-teal-50 border-emerald-200',
+                      '☕': 'from-yellow-50 to-amber-50 border-yellow-200',
+                      '🦸': 'from-amber-50 to-orange-50 border-amber-200',
                       '💰': 'from-green-50 to-emerald-50 border-green-200',
                       '💬': 'from-teal-50 to-cyan-50 border-teal-200',
                       '👨‍👩‍👧': 'from-blue-50 to-sky-50 border-blue-200',
@@ -858,7 +882,7 @@ export function ProfileForm({ user, onSave, onCancel, onEdit, isFirstTime = fals
   if (editSection) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-green-50 to-teal-50 py-8 px-4">
-        <div className="max-w-3xl mx-auto">
+        <div className="max-w-2xl mx-auto">
           {/* Header */}
           <div className="flex items-center justify-between mb-6">
             <button
@@ -889,12 +913,12 @@ export function ProfileForm({ user, onSave, onCancel, onEdit, isFirstTime = fals
                       required
                       value={formData.name}
                       onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                      className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all"
+                      className="max-w-xs px-4 py-3 bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all"
                       placeholder="Ва��е имя"
                     />
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-4">
                     <div>
                       <label className="block text-sm text-gray-700 mb-2">
                         Ваш пол <span className="text-red-500">*</span>
@@ -903,7 +927,7 @@ export function ProfileForm({ user, onSave, onCancel, onEdit, isFirstTime = fals
                         required
                         value={formData.gender}
                         onChange={(e) => setFormData({ ...formData, gender: e.target.value })}
-                        className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all"
+                        className="max-w-xs px-4 py-3 bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all"
                       >
                         <option value="male">Мужской</option>
                         <option value="female">Женский</option>
@@ -919,7 +943,7 @@ export function ProfileForm({ user, onSave, onCancel, onEdit, isFirstTime = fals
                         required
                         value={formData.dateOfBirth}
                         onChange={(e) => setFormData({ ...formData, dateOfBirth: e.target.value })}
-                        className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all"
+                        className="max-w-xs px-4 py-3 bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all"
                       />
                     </div>
                   </div>
@@ -936,9 +960,9 @@ export function ProfileForm({ user, onSave, onCancel, onEdit, isFirstTime = fals
                     <select
                       value={formData.lookingForGender}
                       onChange={(e) => setFormData({ ...formData, lookingForGender: e.target.value })}
-                      className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all"
+                      className="max-w-xs px-4 py-3 bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all"
                     >
-                      <option value="male">Мужской</option>
+                      <option value="male">Мужс��ой</option>
                       <option value="female">Женский</option>
                     </select>
                   </div>
@@ -1050,7 +1074,7 @@ export function ProfileForm({ user, onSave, onCancel, onEdit, isFirstTime = fals
                                   onChange={(e) => setBioPrompts({ ...bioPrompts, [q.key]: e.target.value })}
                                   placeholder={q.placeholder}
                                   rows={4}
-                                  className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all resize-none"
+                                  className="max-w-lg px-4 py-3 bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all resize-none"
                                   autoFocus
                                 />
                               </div>
@@ -1102,7 +1126,7 @@ export function ProfileForm({ user, onSave, onCancel, onEdit, isFirstTime = fals
                                       onChange={(e) => setBioPrompts({ ...bioPrompts, [q.key]: e.target.value })}
                                       placeholder={q.placeholder}
                                       rows={3}
-                                      className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500 transition-all resize-none"
+                                      className="max-w-lg px-4 py-3 bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500 transition-all resize-none"
                                       autoFocus
                                     />
                                   </div>
@@ -1125,7 +1149,7 @@ export function ProfileForm({ user, onSave, onCancel, onEdit, isFirstTime = fals
                 className="w-full bg-gradient-to-br from-emerald-600 to-teal-600 text-white py-4 rounded-full hover:shadow-2xl hover:shadow-emerald-500/40 transition-all duration-300 hover:scale-105 flex items-center justify-center gap-2"
               >
                 <Save className="w-5 h-5" />
-                Сохранить изменения
+                Сохранить изменени��
               </button>
             </div>
           </form>
@@ -1137,7 +1161,7 @@ export function ProfileForm({ user, onSave, onCancel, onEdit, isFirstTime = fals
   // Режим первого создания или полного редактирования
   return (
     <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-green-50 to-teal-50 py-8 px-4">
-      <div className="max-w-3xl mx-auto">
+      <div className="max-w-2xl mx-auto">
         {/* Header */}
         {!isFirstTime && (
           <div className="flex justify-between items-center mb-6">
@@ -1177,12 +1201,12 @@ export function ProfileForm({ user, onSave, onCancel, onEdit, isFirstTime = fals
                   required
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all"
+                  className="max-w-xs px-4 py-3 bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all"
                   placeholder="Ваше имя"
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-4">
                 <div>
                   <label className="block text-sm text-gray-700 mb-2">
                     Ваш пол <span className="text-red-500">*</span>
@@ -1191,7 +1215,7 @@ export function ProfileForm({ user, onSave, onCancel, onEdit, isFirstTime = fals
                     required
                     value={formData.gender}
                     onChange={(e) => setFormData({ ...formData, gender: e.target.value })}
-                    className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all"
+                    className="max-w-xs px-4 py-3 bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all"
                   >
                     <option value="male">Мужской</option>
                     <option value="female">Женский</option>
@@ -1207,7 +1231,7 @@ export function ProfileForm({ user, onSave, onCancel, onEdit, isFirstTime = fals
                     required
                     value={formData.dateOfBirth}
                     onChange={(e) => setFormData({ ...formData, dateOfBirth: e.target.value })}
-                    className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all"
+                    className="max-w-xs px-4 py-3 bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all"
                   />
                 </div>
               </div>
@@ -1227,7 +1251,7 @@ export function ProfileForm({ user, onSave, onCancel, onEdit, isFirstTime = fals
                 <select
                   value={formData.lookingForGender}
                   onChange={(e) => setFormData({ ...formData, lookingForGender: e.target.value })}
-                  className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all"
+                  className="max-w-xs px-4 py-3 bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all"
                 >
                   <option value="male">Мужской</option>
                   <option value="female">Женский</option>

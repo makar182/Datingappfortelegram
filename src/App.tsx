@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { User, MessageCircle, Heart } from 'lucide-react';
 import { Profile } from './components/Profile';
 import { Search } from './components/Search';
@@ -79,7 +79,7 @@ function App() {
       distance: 3,
       photo: 'https://images.unsplash.com/photo-1612739980306-908bac4fc9fe?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxhZHVsdCUyMHdvbWFuJTIwZWxlZ2FudCUyMHBvcnRyYWl0fGVufDF8fHx8MTc2NjI5ODU2MXww&ixlib=rb-4.1.0&q=80&w=1080',
       isOnline: true,
-      bio: '💭 Что меня вдохновляет:\\nСтарые книжные магазины, разговоры после которых хочется переосмыслить всё.',
+      bio: '💭 Что меня вдохновляет:\\\\nСтарые книжные магазины, разговоры после которых хочется переосмыслить всё.',
       gender: 'female',
     },
     {
@@ -87,17 +87,42 @@ function App() {
       name: 'Мария',
       age: 26,
       distance: 5,
-      photo: 'https://images.unsplash.com/photo-1623594675959-02360202d4d6?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxwcm9mZXNzaW9uYWwlMjB3b21hbiUyMHBvcnRyYWl0JTIwc21pbGV8ZW58MXx8fHwxNzY2Mjk4NTYxfDA&ixlib=rb-4.1.0&q=80&w=1080',
+      photo: 'https://images.unsplash.com/photo-1623594675959-02360202d4d6',
       isOnline: false,
-      bio: '🎭 Что меня трогает:\\nМоменты искренности, когда человек становится настоящим.',
+      bio: 'Ищу интересного человека',
       gender: 'female',
     },
   ]);
 
   // Взаимные матчи (кого я лайкнул И кто лайкнул меня)
-  const [mutualMatches, setMutualMatches] = useState<Match[]>([]);
+  // Для тестирования добавляем Елену как взаимный матч
+  const [mutualMatches, setMutualMatches] = useState<Match[]>([
+    {
+      id: 'like-1',
+      name: 'Елена',
+      age: 28,
+      distance: 3,
+      photo: 'https://images.unsplash.com/photo-1612739980306-908bac4fc9fe?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxhZHVsdCUyMHdvbWFuJTIwZWxlZ2FudCUyMHBvcnRyYWl0fGVufDF8fHx8MTc2NjI5ODU2MXww&ixlib=rb-4.1.0&q=80&w=1080',
+      isOnline: true,
+      bio: '💭 Что меня вдохновляет:\\\\\\\\nСтарые книжные магазины, разговоры после которых хочется переосмыслить всё.',
+      gender: 'female',
+    },
+    {
+      id: 'like-2',
+      name: 'Мария',
+      age: 26,
+      distance: 5,
+      photo: 'https://images.unsplash.com/photo-1623594675959-02360202d4d6',
+      isOnline: false,
+      bio: 'Ищу интересного человека',
+      gender: 'female',
+    },
+  ]);
 
-  // Запросы на чат (кто предложил начать чат)
+  // Просмотренные письма (для отслеживания новых)
+  const [viewedInvites, setViewedInvites] = useState<string[]>([]);
+
+  // Запросы а чат (кто предложил начать чат)
   const [chatRequests, setChatRequests] = useState<{from: string, match: Match}[]>([]);
 
   const handleProfileUpdate = (updatedProfile: UserProfile) => {
@@ -164,11 +189,31 @@ function App() {
       // Если есть открытый чат, переходим в Messages
       setActiveTab('messages');
     } else {
-      // Если нет открытого чата, переходим в Приглашения (Search с вкладкой likes)
+      // Если нет открытого чата, переходим в Почту (Search с вкладкой likes)
       setActiveTab('search');
       setSearchInitialTab('likes');
     }
   };
+
+  // Обработчик открытия вкладки почты - помечаем все как просмотренные
+  const handleMarkInvitesAsViewed = useCallback(() => {
+    const allInviteIds = whoLikedMe.map(m => m.id);
+    setViewedInvites(allInviteIds);
+  }, [whoLikedMe]);
+
+  // Удаление матча из всех списков
+  const handleRemoveMatch = (matchId: string) => {
+    // Удаляем из взаимных матчей
+    setMutualMatches(prev => prev.filter(m => m.id !== matchId));
+    // Удаляем из списка "кто меня лайкнул"
+    setWhoLikedMe(prev => prev.filter(m => m.id !== matchId));
+    // Удаляем из моих лайков
+    setMyLikes(prev => prev.filter(id => id !== matchId));
+  };
+
+  // Подсчет новых (непросмотренных) приглашений
+  const newInvitesCount = whoLikedMe.filter(m => !viewedInvites.includes(m.id)).length;
+  const hasNewInvites = newInvitesCount > 0;
 
   const tabs = [
     { id: 'profile', label: 'Профиль', icon: User },
@@ -181,7 +226,7 @@ function App() {
     { 
       id: 'messages', 
       label: 'Чат', 
-      customContent: activeChatMatch !== null ? <MessageCircle className="w-8 h-8" /> : <MailboxIcon hasNewMail={whoLikedMe.length > 0} className="w-8 h-8" />,
+      customContent: activeChatMatch !== null ? <MessageCircle className="w-8 h-8" /> : <MailboxIcon hasNewMail={hasNewInvites} className="w-8 h-8" />,
       isActive: activeChatMatch !== null ? activeTab === 'messages' : (activeTab === 'search' && searchInitialTab === 'likes')
     },
   ];
@@ -214,6 +259,14 @@ function App() {
             onAcceptLike={handleAcceptLike}
             onRequestChat={handleRequestChat}
             initialTab={searchInitialTab}
+            viewedInvites={viewedInvites}
+            onMarkInvitesAsViewed={handleMarkInvitesAsViewed}
+            onSelectMatch={(match) => {
+              setActiveChatMatch(match);
+              setActiveTab('messages');
+            }}
+            onRemoveMatch={handleRemoveMatch}
+            activeChatMatch={activeChatMatch}
           />
         )}
         {activeTab === 'messages' && (
@@ -226,6 +279,7 @@ function App() {
               setActiveTab('search');
               setSearchInitialTab('likes');
             }}
+            onRemoveMatch={handleRemoveMatch}
           />
         )}
       </main>
