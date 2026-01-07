@@ -11,7 +11,12 @@ import {
   ChevronRight,
   Calendar,
   Settings,
-  BookOpen
+  BookOpen,
+  Camera,
+  Upload,
+  ArrowRight,
+  ArrowLeft,
+  Check
 } from 'lucide-react';
 import { ImageWithFallback } from './figma/ImageWithFallback';
 import { ProfileFormBio } from './ProfileFormBio';
@@ -27,6 +32,10 @@ interface ProfileFormProps {
 }
 
 export function ProfileForm({ user, onSave, onCancel, onEdit, isFirstTime = false, isEditing = true, onShowOnboarding }: ProfileFormProps) {
+  // Multi-step form state
+  const [currentStep, setCurrentStep] = useState(isFirstTime ? 1 : 0);
+  const [photoPreview, setPhotoPreview] = useState<string>(user?.photo || '');
+  
   const [formData, setFormData] = useState({
     name: user?.name || 'Марк',
     gender: user?.gender || 'male',
@@ -202,6 +211,18 @@ export function ProfileForm({ user, onSave, onCancel, onEdit, isFirstTime = fals
 
   const [bioPrompts, setBioPrompts] = useState(parseBioPrompts(user?.bio));
 
+  // Handle photo upload
+  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setPhotoPreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   // Вычисляем возраст
   const calculateAge = (dateOfBirth: string) => {
     const today = new Date();
@@ -345,6 +366,7 @@ export function ProfileForm({ user, onSave, onCancel, onEdit, isFirstTime = fals
       name: formData.name,
       gender: formData.gender as 'male' | 'female',
       dateOfBirth: formData.dateOfBirth,
+      photo: photoPreview || undefined,
       lookingForGender: formData.lookingForGender as 'male' | 'female',
       ageRangeMin: formData.ageRangeMin,
       ageRangeMax: formData.ageRangeMax,
@@ -486,7 +508,7 @@ export function ProfileForm({ user, onSave, onCancel, onEdit, isFirstTime = fals
         {
           key: 'family_goal',
           icon: '👨‍👩‍👧',
-          question: 'Считаешь ли ты создание семьи важной целью жизни или лишь одним из возможных сценариев?',
+          question: 'Считаешь ли ты создание семьи важной целью жизни или лишь одним из возможных сценарие��?',
           placeholder: 'Ваш взгляд...',
         },
         {
@@ -878,6 +900,414 @@ export function ProfileForm({ user, onSave, onCancel, onEdit, isFirstTime = fals
     );
   }
 
+  // Multi-step form for first time users
+  if (isFirstTime && currentStep > 0) {
+    const totalSteps = 4;
+    
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-green-50 to-teal-50 flex flex-col">
+        {/* Progress Bar */}
+        <div className="sticky top-0 z-10 bg-white/80 backdrop-blur-sm border-b border-gray-200">
+          <div className="max-w-2xl mx-auto px-4 py-4">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm text-gray-600">Шаг {currentStep} из {totalSteps}</span>
+              <span className="text-sm text-emerald-600">{Math.round((currentStep / totalSteps) * 100)}%</span>
+            </div>
+            <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+              <div 
+                className="h-full bg-gradient-to-r from-emerald-500 to-teal-500 transition-all duration-500"
+                style={{ width: `${(currentStep / totalSteps) * 100}%` }}
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Step Content */}
+        <div className="flex-1 overflow-y-auto pb-24">
+          <div className="max-w-2xl mx-auto px-4 py-8">
+            {/* Step 1: Photo Upload */}
+            {currentStep === 1 && (
+              <div className="space-y-8">
+                <div className="text-center">
+                  <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-emerald-500 to-teal-500 rounded-full mb-4">
+                    <Camera className="w-8 h-8 text-white" />
+                  </div>
+                  <h2 className="text-3xl mb-2 bg-gradient-to-r from-emerald-600 to-teal-600 bg-clip-text text-transparent">
+                    Добавьте фото
+                  </h2>
+                  <p className="text-gray-600">
+                    Профиль с фото получает в 10 раз бо��ьше откликов
+                  </p>
+                  {!photoPreview && (
+                    <p className="text-sm text-gray-500 mt-2">
+                      Или пропустите этот шаг и добавьте позже
+                    </p>
+                  )}
+                </div>
+
+                <div className="flex flex-col items-center">
+                  <div className="relative group mb-6">
+                    <div className="w-48 h-48 rounded-full overflow-hidden bg-gradient-to-br from-emerald-100 to-teal-100 flex items-center justify-center border-4 border-white shadow-xl">
+                      {photoPreview ? (
+                        <img
+                          src={photoPreview}
+                          alt="Preview"
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <div className="flex flex-col items-center gap-2">
+                          <Camera className="w-20 h-20 text-emerald-400" />
+                          <span className="text-sm text-emerald-600">Нажмите, чтобы загрузить</span>
+                        </div>
+                      )}
+                    </div>
+                    <label 
+                      htmlFor="photo-upload"
+                      className="absolute bottom-2 right-2 w-14 h-14 bg-gradient-to-r from-emerald-500 to-teal-500 rounded-full flex items-center justify-center cursor-pointer shadow-lg hover:scale-110 transition-transform duration-300"
+                      title="Загрузить фото"
+                    >
+                      <Upload className="w-6 h-6 text-white" />
+                      <input
+                        id="photo-upload"
+                        type="file"
+                        accept="image/*"
+                        onChange={handlePhotoUpload}
+                        className="hidden"
+                      />
+                    </label>
+                  </div>
+
+                  <div className="text-center space-y-2 text-sm text-gray-500">
+                    <p>• Выберите лучшее фото, где хорошо видно ваше лицо</p>
+                    <p>• Избегайте групповых фотографий</p>
+                    <p>• Естественное освещение работает лучше всего</p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Step 2: Basic Info */}
+            {currentStep === 2 && (
+              <div className="space-y-8">
+                <div className="text-center">
+                  <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-emerald-500 to-teal-500 rounded-full mb-4">
+                    <UserIcon className="w-8 h-8 text-white" />
+                  </div>
+                  <h2 className="text-3xl mb-2 bg-gradient-to-r from-emerald-600 to-teal-600 bg-clip-text text-transparent">
+                    Основная информация
+                  </h2>
+                  <p className="text-gray-600">
+                    Расскажите немного о себе
+                  </p>
+                </div>
+
+                <div className="space-y-6">
+                  <div>
+                    <label className="block text-sm text-gray-700 mb-2">Имя</label>
+                    <input
+                      type="text"
+                      value={formData.name}
+                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                      className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 transition-all"
+                      placeholder="Ваше имя"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm text-gray-700 mb-2">Дата рождения</label>
+                    <input
+                      type="date"
+                      value={formData.dateOfBirth}
+                      onChange={(e) => setFormData({ ...formData, dateOfBirth: e.target.value })}
+                      className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 transition-all"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm text-gray-700 mb-2">Ваш пол</label>
+                    <div className="grid grid-cols-2 gap-3">
+                      <button
+                        type="button"
+                        onClick={() => setFormData({ ...formData, gender: 'male' })}
+                        className={`py-3 px-4 rounded-xl border-2 transition-all ${
+                          formData.gender === 'male'
+                            ? 'border-emerald-500 bg-emerald-50 text-emerald-700'
+                            : 'border-gray-300 hover:border-gray-400'
+                        }`}
+                      >
+                        Мужчина
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setFormData({ ...formData, gender: 'female' })}
+                        className={`py-3 px-4 rounded-xl border-2 transition-all ${
+                          formData.gender === 'female'
+                            ? 'border-emerald-500 bg-emerald-50 text-emerald-700'
+                            : 'border-gray-300 hover:border-gray-400'
+                        }`}
+                      >
+                        Женщина
+                      </button>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm text-gray-700 mb-2">Ищу</label>
+                    <div className="grid grid-cols-2 gap-3">
+                      <button
+                        type="button"
+                        onClick={() => setFormData({ ...formData, lookingForGender: 'male' })}
+                        className={`py-3 px-4 rounded-xl border-2 transition-all ${
+                          formData.lookingForGender === 'male'
+                            ? 'border-emerald-500 bg-emerald-50 text-emerald-700'
+                            : 'border-gray-300 hover:border-gray-400'
+                        }`}
+                      >
+                        Мужчину
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setFormData({ ...formData, lookingForGender: 'female' })}
+                        className={`py-3 px-4 rounded-xl border-2 transition-all ${
+                          formData.lookingForGender === 'female'
+                            ? 'border-emerald-500 bg-emerald-50 text-emerald-700'
+                            : 'border-gray-300 hover:border-gray-400'
+                        }`}
+                      >
+                        Женщину
+                      </button>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm text-gray-700 mb-2">
+                      Возраст: {formData.ageRangeMin} - {formData.ageRangeMax} лет
+                    </label>
+                    <div className="flex gap-4 items-center">
+                      <input
+                        type="range"
+                        min="18"
+                        max="80"
+                        value={formData.ageRangeMin}
+                        onChange={(e) => setFormData({ ...formData, ageRangeMin: parseInt(e.target.value) })}
+                        className="flex-1"
+                      />
+                      <input
+                        type="range"
+                        min="18"
+                        max="80"
+                        value={formData.ageRangeMax}
+                        onChange={(e) => setFormData({ ...formData, ageRangeMax: parseInt(e.target.value) })}
+                        className="flex-1"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm text-gray-700 mb-2">
+                      Радиус поиска: {formData.searchRadius} км
+                    </label>
+                    <input
+                      type="range"
+                      min="1"
+                      max="100"
+                      value={formData.searchRadius}
+                      onChange={(e) => setFormData({ ...formData, searchRadius: parseInt(e.target.value) })}
+                      className="w-full"
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Step 3: About You Questions */}
+            {currentStep === 3 && (
+              <div className="space-y-8">
+                <div className="text-center">
+                  <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-emerald-500 to-teal-500 rounded-full mb-4">
+                    <Sparkles className="w-8 h-8 text-white" />
+                  </div>
+                  <h2 className="text-3xl mb-2 bg-gradient-to-r from-emerald-600 to-teal-600 bg-clip-text text-transparent">
+                    О вас
+                  </h2>
+                  <p className="text-gray-600">
+                    Ответьте на несколько вопросов о себе (необязательно)
+                  </p>
+                  <div className="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-emerald-100 rounded-full">
+                    <span className="text-sm text-emerald-700">
+                      Заполнено: {aboutYouFilledCount} из {aboutYouQuestions.length}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  {aboutYouQuestions.map((q) => {
+                    const isExpanded = expandedQuestions.has(q.key);
+                    const hasAnswer = bioPrompts[q.key as keyof typeof bioPrompts]?.trim();
+                    
+                    return (
+                      <div key={q.key} className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+                        <button
+                          type="button"
+                          onClick={() => toggleQuestion(q.key)}
+                          className="w-full p-4 flex items-start gap-3 text-left hover:bg-gray-50 transition-colors"
+                        >
+                          <span className="text-2xl flex-shrink-0">{q.icon}</span>
+                          <div className="flex-1">
+                            <p className="text-gray-800">{q.question}</p>
+                            {hasAnswer && !isExpanded && (
+                              <p className="text-sm text-emerald-600 mt-1">✓ Ответ сохранён</p>
+                            )}
+                          </div>
+                          <ChevronRight className={`w-5 h-5 text-gray-400 flex-shrink-0 transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
+                        </button>
+                        
+                        {isExpanded && (
+                          <div className="p-4 pt-0 border-t border-gray-100">
+                            <textarea
+                              value={bioPrompts[q.key as keyof typeof bioPrompts] || ''}
+                              onChange={(e) => setBioPrompts({ ...bioPrompts, [q.key]: e.target.value })}
+                              placeholder={q.placeholder}
+                              rows={4}
+                              className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 transition-all resize-none"
+                            />
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Step 4: Opinion Questions */}
+            {currentStep === 4 && (
+              <div className="space-y-8">
+                <div className="text-center">
+                  <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-emerald-500 to-teal-500 rounded-full mb-4">
+                    <Heart className="w-8 h-8 text-white" />
+                  </div>
+                  <h2 className="text-3xl mb-2 bg-gradient-to-r from-emerald-600 to-teal-600 bg-clip-text text-transparent">
+                    Ваше мнение
+                  </h2>
+                  <p className="text-gray-600">
+                    Поделитесь своими взглядами (необязательно)
+                  </p>
+                  <div className="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-emerald-100 rounded-full">
+                    <span className="text-sm text-emerald-700">
+                      Заполнено: {opinionFilledCount} из {totalOpinionQuestions}
+                    </span>
+                  </div>
+                </div>
+
+                {opinionQuestions.map((section) => (
+                  <div key={section.section} className="space-y-4">
+                    <h3 className="text-lg text-gray-700 px-2 flex items-center gap-2">
+                      <div className="h-1 w-8 bg-gradient-to-r from-emerald-500 to-teal-500 rounded-full"></div>
+                      {section.section}
+                    </h3>
+                    
+                    {section.questions.map((q) => {
+                      const isExpanded = expandedQuestions.has(q.key);
+                      const hasAnswer = bioPrompts[q.key as keyof typeof bioPrompts]?.trim();
+                      
+                      return (
+                        <div key={q.key} className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+                          <button
+                            type="button"
+                            onClick={() => toggleQuestion(q.key)}
+                            className="w-full p-4 flex items-start gap-3 text-left hover:bg-gray-50 transition-colors"
+                          >
+                            <span className="text-2xl flex-shrink-0">{q.icon}</span>
+                            <div className="flex-1">
+                              <p className="text-gray-800">{q.question}</p>
+                              {hasAnswer && !isExpanded && (
+                                <p className="text-sm text-emerald-600 mt-1">✓ Ответ сохранён</p>
+                              )}
+                            </div>
+                            <ChevronRight className={`w-5 h-5 text-gray-400 flex-shrink-0 transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
+                          </button>
+                          
+                          {isExpanded && (
+                            <div className="p-4 pt-0 border-t border-gray-100">
+                              <textarea
+                                value={bioPrompts[q.key as keyof typeof bioPrompts] || ''}
+                                onChange={(e) => setBioPrompts({ ...bioPrompts, [q.key]: e.target.value })}
+                                placeholder={q.placeholder}
+                                rows={4}
+                                className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 transition-all resize-none"
+                              />
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Navigation Buttons */}
+        <div className="sticky bottom-0 bg-white border-t border-gray-200 p-4">
+          <div className="max-w-2xl mx-auto flex gap-3">
+            {currentStep > 1 && (
+              <button
+                type="button"
+                onClick={() => setCurrentStep(currentStep - 1)}
+                className="flex items-center gap-2 px-6 py-3 rounded-xl border-2 border-gray-300 hover:border-gray-400 transition-all"
+              >
+                <ArrowLeft className="w-5 h-5" />
+                Назад
+              </button>
+            )}
+            
+            {/* Skip button for photo step */}
+            {currentStep === 1 && !photoPreview && (
+              <button
+                type="button"
+                onClick={() => setCurrentStep(2)}
+                className="flex items-center gap-2 px-6 py-3 rounded-xl border-2 border-gray-300 hover:border-gray-400 transition-all text-gray-600"
+              >
+                Пропустить
+              </button>
+            )}
+            
+            <button
+              type="button"
+              onClick={() => {
+                if (currentStep < totalSteps) {
+                  setCurrentStep(currentStep + 1);
+                } else {
+                  handleSubmit(new Event('submit') as any);
+                }
+              }}
+              className="flex-1 flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 text-white hover:shadow-lg transition-all"
+            >
+              {currentStep === totalSteps ? (
+                <>
+                  <Check className="w-5 h-5" />
+                  Завершить
+                </>
+              ) : currentStep === 1 && photoPreview ? (
+                <>
+                  Продолжить с фото
+                  <ArrowRight className="w-5 h-5" />
+                </>
+              ) : (
+                <>
+                  Далее
+                  <ArrowRight className="w-5 h-5" />
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   // Режим редактирования конкретной секции
   if (editSection) {
     return (
@@ -904,6 +1334,46 @@ export function ProfileForm({ user, onSave, onCancel, onEdit, isFirstTime = fals
             {editSection === 'basic' && (
               <div className="bg-white/80 backdrop-blur-sm rounded-3xl p-6 shadow-lg border border-white">
                 <div className="space-y-4">
+                  {/* Photo Upload */}
+                  <div className="mb-6">
+                    <label className="block text-sm text-gray-700 mb-3">
+                      Фото профиля
+                    </label>
+                    <div className="flex items-center gap-6">
+                      <div className="relative group">
+                        <div className="w-24 h-24 rounded-full overflow-hidden bg-gradient-to-br from-emerald-100 to-teal-100 flex items-center justify-center border-4 border-white shadow-lg">
+                          {photoPreview ? (
+                            <img
+                              src={photoPreview}
+                              alt="Preview"
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <Camera className="w-10 h-10 text-emerald-400" />
+                          )}
+                        </div>
+                        <label 
+                          htmlFor="photo-upload-edit"
+                          className="absolute bottom-0 right-0 w-8 h-8 bg-gradient-to-r from-emerald-500 to-teal-500 rounded-full flex items-center justify-center cursor-pointer shadow-lg hover:scale-110 transition-transform duration-300"
+                        >
+                          <Upload className="w-4 h-4 text-white" />
+                          <input
+                            id="photo-upload-edit"
+                            type="file"
+                            accept="image/*"
+                            onChange={handlePhotoUpload}
+                            className="hidden"
+                          />
+                        </label>
+                      </div>
+                      <div className="flex-1 text-sm text-gray-600">
+                        <p className="mb-1">• Выберите лучшее фото</p>
+                        <p className="mb-1">• Хорошо видно лицо</p>
+                        <p>• Без групповых снимков</p>
+                      </div>
+                    </div>
+                  </div>
+                  
                   <div>
                     <label className="block text-sm text-gray-700 mb-2">
                       Как вас зовут? <span className="text-red-500">*</span>
